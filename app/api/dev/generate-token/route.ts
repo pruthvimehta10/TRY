@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { SignJWT } from 'jose'
 
 export async function POST(request: NextRequest) {
-    // Only allow in development
-    if (process.env.NODE_ENV === 'production') {
+    // Allow in development OR if explicitly enabled
+    if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_ALLOW_DEV_TOOLS !== 'true') {
         return NextResponse.json({ error: 'Not available in production' }, { status: 403 })
     }
 
