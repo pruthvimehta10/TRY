@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Plus, Save, FileQuestion, Edit, Trash2, Loader2, Video } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { LessonEditDialog } from '@/components/admin/lesson-edit-dialog'
+import { ModuleManager } from '@/components/admin/module-manager'
 
 interface Lesson {
     id: string
@@ -282,6 +283,11 @@ export default function AdminCourseEditPage({ params }: { params: Promise<{ id: 
                             </Table>
                         </CardContent>
                     </Card>
+
+                    {/* Module Management */}
+                    <div className="pt-6 border-t-8 border-foreground border-dashed">
+                        <ModuleManager courseId={courseId} />
+                    </div>
                 </div>
 
                 {/* Sidebar Settings */}
