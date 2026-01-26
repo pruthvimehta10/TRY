@@ -1,16 +1,16 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, Trash2, Layers, Loader2, GripVertical, ChevronDown, ChevronRight, Video, FileQuestion, Save, X, Edit, ExternalLink, Send } from 'lucide-react'
+import { Plus, Trash2, Layers, Loader2, GripVertical, ChevronDown, ChevronRight, Video, FileQuestion, Save, X, ExternalLink, Send, Upload } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { LessonEditDialog } from '@/components/admin/lesson-edit-dialog'
 import Link from 'next/link'
+import { QuizEditDialog } from '@/components/admin/quiz-edit-dialog'
 
 interface Lesson {
     id: string
@@ -20,6 +20,8 @@ interface Lesson {
     video_url?: string
     video_duration_seconds?: number
     order_index: number
+    hasQuiz?: boolean
+    quiz_questions?: { count: number }[]
 }
 
 interface Topic {
@@ -45,6 +47,7 @@ interface DraftLesson {
     tempId: string
     title: string
     type: 'video' | 'quiz'
+    video_url?: string
 }
 
 interface DraftTopic {
@@ -70,15 +73,26 @@ export function ModuleManager({ courseId }: ModuleManagerProps) {
     const [draftTopics, setDraftTopics] = useState<DraftTopic[]>([])
     const [isSavingDraft, setIsSavingDraft] = useState(false)
 
-    // --- Inline Drafting (Topic in Existing Module) ---
+    // --- Drafting States (Topic in Existing Module) ---
     const [draftingTopicModuleId, setDraftingTopicModuleId] = useState<string | null>(null)
     const [draftTopicTitle, setDraftTopicTitle] = useState('')
-    const [draftTopicLessons, setDraftTopicLessons] = useState<DraftLesson[]>([])
-    const [isSavingInlineTopic, setIsSavingInlineTopic] = useState(false)
+    const [isSavingTopic, setIsSavingTopic] = useState(false)
 
-    // --- Edit Dialog State ---
-    const [editingLesson, setEditingLesson] = useState<any | null>(null)
-    const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false)
+    // --- Progressive Addition (Lessons to Existing Topic) ---
+    const [addingLessonToTopicId, setAddingLessonToTopicId] = useState<{ id: string, type: 'video' | 'quiz' } | null>(null)
+    const [newLessonTitle, setNewLessonTitle] = useState('')
+    const [isSavingNewLesson, setIsSavingNewLesson] = useState(false)
+
+    // --- Professional Deletion State ---
+    const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'module' | 'topic' | 'lesson' } | null>(null)
+
+    // --- Video Upload State ---
+    const [uploadingLessonId, setUploadingLessonId] = useState<string | null>(null)
+    const fileInputRefs = useRef<Record<string, HTMLInputElement>>({})
+
+    // --- Quiz Dialog State ---
+    const [editingQuizLesson, setEditingQuizLesson] = useState<{ id: string, title: string, course_id: string } | null>(null)
+    const [isQuizDialogOpen, setIsQuizDialogOpen] = useState(false)
 
     useEffect(() => {
         fetchData()
@@ -157,6 +171,7 @@ export function ModuleManager({ courseId }: ModuleManagerProps) {
         } : t))
     }
 
+
     const handleSaveDraft = async () => {
         if (!draftTitle.trim()) return
         setIsSavingDraft(true)
@@ -205,92 +220,126 @@ export function ModuleManager({ courseId }: ModuleManagerProps) {
         }
     }
 
-    const resetInlineTopic = () => {
-        setDraftingTopicModuleId(null)
-        setDraftTopicTitle('')
-        setDraftTopicLessons([])
-        setIsSavingInlineTopic(false)
-    }
-
-    const handleSaveInlineTopic = async () => {
-        if (!draftTopicTitle.trim() || !draftingTopicModuleId) return
-        setIsSavingInlineTopic(true)
-
-        try {
-            // 1. Save Topic
-            const order_index = (modules.find(m => m.id === draftingTopicModuleId)?.topics.length || 0)
-            const { data: topicData, error: tErr } = await supabase
-                .from('topics')
-                .insert({ module_id: draftingTopicModuleId, title: draftTopicTitle, order_index })
-                .select().single()
-
-            if (tErr) throw tErr
-
-            // 2. Save Lessons
-            if (draftTopicLessons.length > 0) {
-                const lessonsToInsert = draftTopicLessons.map((l, lIdx) => ({
-                    topic_id: topicData.id,
-                    course_id: courseId,
-                    title: l.title,
-                    order_index: lIdx,
-                    video_url: l.type === 'video' ? '' : null
-                }))
-                const { error: lErr } = await supabase.from('lessons').insert(lessonsToInsert)
-                if (lErr) throw lErr
-            }
-
-            await fetchData()
-            setExpandedModules(prev => ({ ...prev, [draftingTopicModuleId]: true }))
-            setExpandedTopics(prev => ({ ...prev, [topicData.id]: true }))
-            resetInlineTopic()
-        } catch (err: any) {
-            console.error('Inline topic save failed:', err)
-            alert('Failed to save topic: ' + err.message)
-        } finally {
-            setIsSavingInlineTopic(false)
-        }
-    }
-
     // --- Existing Structure Actions (Persistent) ---
-    async function handleAddTopicPersistent(moduleId: string) {
+    async function handleStartAddTopic(moduleId: string) {
         setDraftingTopicModuleId(moduleId)
-        setDraftTopicTitle('New Topic')
-        setDraftTopicLessons([])
+        setDraftTopicTitle('New Topic Name')
         setExpandedModules(prev => ({ ...prev, [moduleId]: true }))
     }
 
-    async function handleAddLessonPersistent(topicId: string, moduleId: string, type: 'video' | 'quiz') {
-        const title = prompt(`Enter ${type === 'video' ? 'Video' : 'Quiz'} Title:`)
-        if (!title) return
-        const mIdx = modules.findIndex(m => m.id === moduleId)
-        const tIdx = modules[mIdx].topics.findIndex(t => t.id === topicId)
-        const order_index = modules[mIdx].topics[tIdx].lessons.length
-        const { data, error } = await supabase.from('lessons').insert({ topic_id: topicId, course_id: courseId, title, order_index, video_url: type === 'video' ? '' : null }).select().single()
+    async function handleConfirmAddTopic(moduleId: string) {
+        if (!draftTopicTitle.trim()) return
+        setIsSavingTopic(true)
+
+        const order_index = (modules.find(m => m.id === moduleId)?.topics.length || 0)
+        const { data, error } = await supabase
+            .from('topics')
+            .insert({ module_id: moduleId, title: draftTopicTitle, order_index })
+            .select().single()
+
         if (data) {
             await fetchData()
-            if (type === 'video') { setEditingLesson(data); setIsLessonDialogOpen(true); }
+            setDraftingTopicModuleId(null)
+            setExpandedTopics(prev => ({ ...prev, [data.id]: true }))
+        }
+        setIsSavingTopic(false)
+    }
+
+    async function handleStartAddLesson(topicId: string, type: 'video' | 'quiz') {
+        setAddingLessonToTopicId({ id: topicId, type })
+        setNewLessonTitle(`New ${type === 'video' ? 'Video' : 'Quiz'}`)
+        setExpandedTopics(prev => ({ ...prev, [topicId]: true }))
+    }
+
+    async function handleConfirmAddLesson(topicId: string, moduleId: string) {
+        if (!newLessonTitle.trim() || !addingLessonToTopicId) return
+        setIsSavingNewLesson(true)
+
+        const mIdx = modules.findIndex(m => m.id === moduleId)
+        const tIdx = modules[mIdx].topics.findIndex(t => t.id === topicId)
+        const order_index = (modules[mIdx].topics[tIdx].lessons?.length || 0)
+
+        const { data, error } = await supabase
+            .from('lessons')
+            .insert({
+                topic_id: topicId,
+                course_id: courseId,
+                title: newLessonTitle,
+                order_index,
+                video_url: addingLessonToTopicId.type === 'video' ? '' : null
+            })
+            .select().single()
+
+        if (data) {
+            await fetchData()
+            // If it's a video lesson, trigger file picker immediately
+            if (addingLessonToTopicId.type === 'video' && data.id) {
+                setTimeout(() => {
+                    fileInputRefs.current[data.id]?.click()
+                }, 100)
+            }
+            // If it's a quiz lesson, open quiz dialog
+            if (addingLessonToTopicId.type === 'quiz' && data.id) {
+                setEditingQuizLesson({ id: data.id, title: data.title, course_id: courseId })
+                setIsQuizDialogOpen(true)
+            }
+            setAddingLessonToTopicId(null)
+            setNewLessonTitle('')
+        }
+        setIsSavingNewLesson(false)
+    }
+
+    async function handleVideoUpload(lessonId: string, file: File) {
+        setUploadingLessonId(lessonId)
+        try {
+            const fileExt = file.name.split('.').pop()
+            const fileName = `${crypto.randomUUID()}.${fileExt}`
+            const filePath = `lesson-videos/${fileName}`
+
+            const { data, error } = await supabase.storage
+                .from('videos')
+                .upload(filePath, file, {
+                    cacheControl: '3600',
+                    upsert: false
+                })
+
+            if (error) throw error
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('videos')
+                .getPublicUrl(filePath)
+
+            const { error: updateError } = await supabase
+                .from('lessons')
+                .update({ video_url: publicUrl })
+                .eq('id', lessonId)
+
+            if (updateError) throw updateError
+
+            await fetchData()
+        } catch (err: any) {
+            alert('Upload failed: ' + err.message)
+        } finally {
+            setUploadingLessonId(null)
         }
     }
 
     async function handleDeleteModule(id: string) {
-        if (confirm('Delete module and everything inside?')) {
-            await supabase.from('modules').delete().eq('id', id)
-            setModules(modules.filter(m => m.id !== id))
-        }
+        await supabase.from('modules').delete().eq('id', id)
+        setModules(modules.filter(m => m.id !== id))
+        setConfirmDelete(null)
     }
 
     async function handleDeleteTopic(topicId: string) {
-        if (confirm('Delete topic and lessons?')) {
-            await supabase.from('topics').delete().eq('id', topicId)
-            await fetchData()
-        }
+        await supabase.from('topics').delete().eq('id', topicId)
+        await fetchData()
+        setConfirmDelete(null)
     }
 
     async function handleDeleteLesson(lessonId: string) {
-        if (confirm('Delete lesson?')) {
-            await supabase.from('lessons').delete().eq('id', lessonId)
-            await fetchData()
-        }
+        await supabase.from('lessons').delete().eq('id', lessonId)
+        await fetchData()
+        setConfirmDelete(null)
     }
 
     return (
@@ -361,8 +410,8 @@ export function ModuleManager({ courseId }: ModuleManagerProps) {
                                             <div className="space-y-2">
                                                 {t.lessons.map((l) => (
                                                     <div key={l.tempId} className="ml-6 flex items-center gap-2">
-                                                        <div className="p-1 bg-secondary border-2 border-foreground">
-                                                            {l.type === 'video' ? <Video className="h-3 w-3" /> : <FileQuestion className="h-3 w-3" />}
+                                                        <div className="p-1 bg-secondary border-2 border-foreground h-8 w-8 flex items-center justify-center shrink-0">
+                                                            {l.type === 'video' ? <Video className="h-4 w-4" /> : <FileQuestion className="h-4 w-4" />}
                                                         </div>
                                                         <Input
                                                             value={l.title}
@@ -409,7 +458,7 @@ export function ModuleManager({ courseId }: ModuleManagerProps) {
                     modules.map((module, mIdx) => (
                         <div key={module.id} className="border-4 border-foreground bg-background shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] group overflow-hidden">
                             {/* Module Header */}
-                            <div className="flex items-center bg-cyan-500 text-white p-4 border-b-4 border-foreground">
+                            <div className="flex items-center bg-cyan-500 text-white p-4 border-b-4 border-foreground relative">
                                 <button onClick={() => setExpandedModules({ ...expandedModules, [module.id]: !expandedModules[module.id] })} className="mr-3 hover:scale-125 transition-transform">
                                     {expandedModules[module.id] ? <ChevronDown className="h-6 w-6 stroke-[3px]" /> : <ChevronRight className="h-6 w-6 stroke-[3px]" />}
                                 </button>
@@ -419,63 +468,54 @@ export function ModuleManager({ courseId }: ModuleManagerProps) {
                                     </div>
                                     <h4 className="font-black text-xl uppercase tracking-tight leading-tight">{module.title}</h4>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Button size="sm" onClick={() => handleAddTopicPersistent(module.id)} className="bg-yellow-300 text-foreground border-2 border-foreground font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-px hover:translate-y-px hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]">
-                                        + TOPIC
-                                    </Button>
-                                    <Button size="icon" variant="ghost" onClick={() => handleDeleteModule(module.id)} className="text-white hover:bg-red-500 border-2 border-transparent hover:border-foreground h-9 w-9">
-                                        <Trash2 className="h-5 w-5" />
-                                    </Button>
-                                </div>
+
+                                {confirmDelete?.id === module.id ? (
+                                    <div className="flex items-center gap-2 animate-in zoom-in-95 duration-200">
+                                        <div className="flex items-center bg-white border-2 border-foreground p-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                                            <span className="text-[10px] font-black uppercase text-red-600 px-2">Permanently Delete?</span>
+                                            <Button size="sm" onClick={() => handleDeleteModule(module.id)} className="bg-red-500 text-white border-2 border-foreground font-black h-7 hover:bg-red-600">SURE</Button>
+                                            <Button size="icon" variant="ghost" onClick={() => setConfirmDelete(null)} className="h-7 w-7 border-2 border-foreground ml-1 text-foreground"><X className="h-4 w-4" /></Button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <Button size="sm" onClick={() => handleStartAddTopic(module.id)} className="bg-yellow-300 text-foreground border-2 border-foreground font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-px hover:translate-y-px hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]">
+                                            + TOPIC
+                                        </Button>
+                                        <Button size="icon" variant="ghost" onClick={() => setConfirmDelete({ id: module.id, type: 'module' })} className="text-white hover:bg-red-500 border-2 border-transparent hover:border-foreground h-9 w-9">
+                                            <Trash2 className="h-5 w-5" />
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Content */}
                             {expandedModules[module.id] && (
                                 <div className="p-4 bg-slate-50 dark:bg-slate-900/50 space-y-6">
+
                                     {/* Inline Topic Builder */}
                                     {draftingTopicModuleId === module.id && (
                                         <div className="ml-6 border-4 border-foreground bg-yellow-100 dark:bg-yellow-900/20 p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] animate-in slide-in-from-left-2">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <h5 className="font-black text-xs uppercase opacity-60">Drafting New Topic</h5>
-                                                <Button size="icon" variant="ghost" onClick={resetInlineTopic} className="h-6 w-6 text-foreground"><X className="h-4 w-4" /></Button>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h5 className="font-black text-xs uppercase opacity-60">New Topic</h5>
+                                                <Button size="icon" variant="ghost" onClick={() => setDraftingTopicModuleId(null)} className="h-6 w-6 text-foreground"><X className="h-4 w-4" /></Button>
                                             </div>
-                                            <Input
-                                                value={draftTopicTitle}
-                                                onChange={(e) => setDraftTopicTitle(e.target.value)}
-                                                placeholder="Topic Title..."
-                                                className="border-2 border-foreground bg-background font-bold mb-4"
-                                            />
-                                            <div className="space-y-2 mb-4">
-                                                {draftTopicLessons.map((l, lIdx) => (
-                                                    <div key={l.tempId} className="ml-4 flex items-center gap-2">
-                                                        <div className="p-1 bg-white border-2 border-foreground">
-                                                            {l.type === 'video' ? <Video className="h-3 w-3" /> : <FileQuestion className="h-3 w-3" />}
-                                                        </div>
-                                                        <Input
-                                                            value={l.title}
-                                                            onChange={(e) => setDraftTopicLessons(draftTopicLessons.map(dl => dl.tempId === l.tempId ? { ...dl, title: e.target.value } : dl))}
-                                                            className="h-8 border-2 border-foreground text-xs font-bold flex-1 bg-background"
-                                                        />
-                                                        <Button size="icon" variant="ghost" onClick={() => setDraftTopicLessons(draftTopicLessons.filter(dl => dl.tempId !== l.tempId))} className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button>
-                                                    </div>
-                                                ))}
-                                                <div className="ml-4 flex gap-2">
-                                                    <Button size="sm" variant="outline" onClick={() => setDraftTopicLessons([...draftTopicLessons, { tempId: crypto.randomUUID(), title: 'New Video', type: 'video' }])} className="text-[10px] font-black border-2 border-foreground h-7">+ VIDEO</Button>
-                                                    <Button size="sm" variant="outline" onClick={() => setDraftTopicLessons([...draftTopicLessons, { tempId: crypto.randomUUID(), title: 'New Quiz', type: 'quiz' }])} className="text-[10px] font-black border-2 border-foreground h-7">+ QUIZ</Button>
-                                                </div>
+                                            <div className="flex gap-2 relative">
+                                                <Input
+                                                    autoFocus
+                                                    value={draftTopicTitle}
+                                                    onChange={(e) => setDraftTopicTitle(e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleConfirmAddTopic(module.id)}
+                                                    className="border-2 border-foreground bg-background font-bold h-10 flex-1 focus-visible:ring-0 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                                                />
+                                                <Button onClick={() => handleConfirmAddTopic(module.id)} disabled={isSavingTopic} className="bg-foreground text-background font-black h-10 border-2 border-foreground shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-px hover:translate-y-px hover:shadow-none transition-all">
+                                                    {isSavingTopic ? <Loader2 className="animate-spin h-4 w-4" /> : 'SAVE'}
+                                                </Button>
                                             </div>
-                                            <Button
-                                                onClick={handleSaveInlineTopic}
-                                                disabled={isSavingInlineTopic || !draftTopicTitle.trim()}
-                                                className="w-full border-4 border-foreground bg-foreground text-background font-black py-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-px hover:translate-y-px hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
-                                            >
-                                                {isSavingInlineTopic ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
-                                                SAVE TOPIC
-                                            </Button>
                                         </div>
                                     )}
 
-                                    {module.topics.length > 0 ? module.topics.map((topic, tIdx) => (
+                                    {module.topics?.length > 0 ? module.topics.map((topic, tIdx) => (
                                         <div key={topic.id} className="ml-6 space-y-3">
                                             {/* Topic Header */}
                                             <div className="flex items-center gap-3 pb-2 border-b-2 border-foreground/10">
@@ -483,28 +523,155 @@ export function ModuleManager({ courseId }: ModuleManagerProps) {
                                                     {expandedTopics[topic.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                                 </button>
                                                 <h5 className="font-black text-sm uppercase flex-1 opacity-70">Topic {tIdx + 1}: {topic.title}</h5>
-                                                <div className="flex gap-1">
-                                                    <Button size="icon" variant="ghost" onClick={() => handleAddLessonPersistent(topic.id, module.id, 'video')} className="h-7 w-7 border border-foreground/20 hover:border-foreground"><Video className="h-3 w-3" /></Button>
-                                                    <Button size="icon" variant="ghost" onClick={() => handleAddLessonPersistent(topic.id, module.id, 'quiz')} className="h-7 w-7 border border-foreground/20 hover:border-foreground"><FileQuestion className="h-3 w-3" /></Button>
-                                                    <Button size="icon" variant="ghost" onClick={() => handleDeleteTopic(topic.id)} className="h-7 w-7 text-destructive hover:bg-destructive/10"><Trash2 className="h-3 w-3" /></Button>
-                                                </div>
+
+                                                {confirmDelete?.id === topic.id ? (
+                                                    <div className="flex items-center gap-1 animate-in slide-in-from-right-2 duration-200">
+                                                        <div className="flex items-center bg-white border-2 border-foreground p-0.5 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] uppercase font-black">
+                                                            <span className="text-[9px] px-1 text-red-600">Delete Topic?</span>
+                                                            <Button size="sm" onClick={() => handleDeleteTopic(topic.id)} className="h-6 px-2 bg-red-500 text-white text-[10px] border-2 border-foreground">YES</Button>
+                                                            <Button size="icon" variant="ghost" onClick={() => setConfirmDelete(null)} className="h-6 w-6 text-foreground"><X className="h-3 w-3" /></Button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex gap-1 text-foreground">
+                                                        <Button size="icon" variant="ghost" onClick={() => handleStartAddLesson(topic.id, 'video')} className="h-7 w-7 border-2 border-foreground/10 hover:border-foreground hover:bg-yellow-100"><Video className="h-3 w-3" /></Button>
+                                                        <Button size="icon" variant="ghost" onClick={() => handleStartAddLesson(topic.id, 'quiz')} className="h-7 w-7 border-2 border-foreground/10 hover:border-foreground hover:bg-blue-100"><FileQuestion className="h-3 w-3" /></Button>
+                                                        <Button size="icon" variant="ghost" onClick={() => setConfirmDelete({ id: topic.id, type: 'topic' })} className="h-7 w-7 text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 className="h-3.5 w-3.5" /></Button>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* Nested Lessons */}
                                             {expandedTopics[topic.id] && (
                                                 <div className="ml-6 space-y-2">
-                                                    {topic.lessons.length > 0 ? topic.lessons.map((lesson) => (
+                                                    {topic.lessons?.length > 0 && topic.lessons.map((lesson) => (
                                                         <div key={lesson.id} className="flex items-center gap-3 p-2 bg-background border-2 border-foreground shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
                                                             <div className="p-1 bg-secondary/40 border-2 border-foreground">
-                                                                {lesson.video_url !== null ? <Video className="h-3.5 w-3.5" /> : <FileQuestion className="h-3.5 w-3.5" />}
+                                                                {lesson.video_url !== null ? <Video className="h-3.5 w-3.5 text-foreground" /> : <FileQuestion className="h-3.5 w-3.5 text-foreground" />}
                                                             </div>
-                                                            <p className="flex-1 font-bold text-xs uppercase">{lesson.title}</p>
+                                                            <p className="flex-1 font-bold text-xs uppercase text-foreground">{lesson.title}</p>
+
+                                                            {confirmDelete?.id === lesson.id ? (
+                                                                <div className="flex items-center gap-1 animate-in slide-in-from-right-2">
+                                                                    <div className="flex items-center bg-white border-2 border-foreground p-0.5 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] font-black">
+                                                                        <span className="text-[8px] uppercase px-1 text-red-600">DELETE?</span>
+                                                                        <Button size="sm" onClick={() => handleDeleteLesson(lesson.id)} className="h-6 px-2 bg-red-500 text-white text-[10px] border-2 border-foreground">YES</Button>
+                                                                        <Button size="icon" variant="ghost" onClick={() => setConfirmDelete(null)} className="h-6 w-6 text-foreground"><X className="h-3 w-3" /></Button>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex gap-1">
+                                                                    {lesson.video_url !== null && (
+                                                                        <>
+                                                                            <input
+                                                                                type="file"
+                                                                                accept="video/*"
+                                                                                className="hidden"
+                                                                                ref={(el) => {
+                                                                                    if (el) fileInputRefs.current[lesson.id] = el
+                                                                                }}
+                                                                                onChange={(e) => {
+                                                                                    const file = e.target.files?.[0]
+                                                                                    if (file) {
+                                                                                        handleVideoUpload(lesson.id, file)
+                                                                                    }
+                                                                                    // Reset input so same file can be selected again
+                                                                                    e.target.value = ''
+                                                                                }}
+                                                                            />
+                                                                            <Button 
+                                                                                size="icon" 
+                                                                                variant="ghost" 
+                                                                                onClick={() => fileInputRefs.current[lesson.id]?.click()} 
+                                                                                disabled={uploadingLessonId === lesson.id}
+                                                                                className={cn(
+                                                                                    "h-7 w-7 border border-transparent hover:border-foreground",
+                                                                                    lesson.video_url ? "hover:bg-green-100 text-green-600" : "hover:bg-yellow-100 text-yellow-600"
+                                                                                )}
+                                                                            >
+                                                                                {uploadingLessonId === lesson.id ? (
+                                                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                                ) : (
+                                                                                    <Upload className="h-3.5 w-3.5" />
+                                                                                )}
+                                                                            </Button>
+                                                                        </>
+                                                                    )}
+                                                                    {lesson.video_url === null && (
+                                                                        <Button 
+                                                                            size="icon" 
+                                                                            variant="ghost" 
+                                                                            onClick={() => {
+                                                                                setEditingQuizLesson({ 
+                                                                                    id: lesson.id, 
+                                                                                    title: lesson.title, 
+                                                                                    course_id: courseId 
+                                                                                })
+                                                                                setIsQuizDialogOpen(true)
+                                                                            }}
+                                                                            className={cn(
+                                                                                "h-7 w-7 border border-transparent hover:border-foreground",
+                                                                                lesson.hasQuiz ? "hover:bg-green-100 text-green-600" : "hover:bg-blue-100 text-blue-600"
+                                                                            )}
+                                                                            title={lesson.hasQuiz ? "Edit Quiz" : "Create Quiz"}
+                                                                        >
+                                                                            <FileQuestion className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                    )}
+                                                                    {lesson.video_url === null && (
+                                                                        <Button 
+                                                                            size="icon" 
+                                                                            variant="ghost" 
+                                                                            onClick={() => {
+                                                                                setEditingQuizLesson({ 
+                                                                                    id: lesson.id, 
+                                                                                    title: lesson.title, 
+                                                                                    course_id: courseId 
+                                                                                })
+                                                                                setIsQuizDialogOpen(true)
+                                                                            }}
+                                                                            className={cn(
+                                                                                "h-7 w-7 border border-transparent hover:border-foreground",
+                                                                                lesson.hasQuiz ? "hover:bg-green-100 text-green-600" : "hover:bg-blue-100 text-blue-600"
+                                                                            )}
+                                                                            title={lesson.hasQuiz ? "Edit Quiz" : "Create Quiz"}
+                                                                        >
+                                                                            <FileQuestion className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                    )}
+                                                                    <Button size="icon" variant="ghost" onClick={() => setConfirmDelete({ id: lesson.id, type: 'lesson' })} className="h-7 w-7 text-red-500/50 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-foreground">
+                                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+
+                                                    {/* Inline Lesson Builder for Existing Topic */}
+                                                    {addingLessonToTopicId?.id === topic.id && (
+                                                        <div className="flex items-center gap-2 p-2 bg-accent/10 border-2 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] animate-in slide-in-from-top-1">
+                                                            <div className="p-1.5 bg-background border-2 border-foreground">
+                                                                {addingLessonToTopicId.type === 'video' ? <Video className="h-4 w-4" /> : <FileQuestion className="h-4 w-4" />}
+                                                            </div>
+                                                            <Input
+                                                                autoFocus
+                                                                value={newLessonTitle}
+                                                                onChange={(e) => setNewLessonTitle(e.target.value)}
+                                                                onKeyDown={(e) => e.key === 'Enter' && handleConfirmAddLesson(topic.id, module.id)}
+                                                                className="h-10 border-2 border-foreground bg-background font-bold text-sm flex-1 focus-visible:ring-0"
+                                                            />
                                                             <div className="flex gap-1">
-                                                                <Button size="icon" variant="ghost" onClick={() => { setEditingLesson(lesson); setIsLessonDialogOpen(true); }} className="h-7 w-7 hover:bg-blue-100"><Edit className="h-3.5 w-3.5" /></Button>
-                                                                <Button size="icon" variant="ghost" onClick={() => handleDeleteLesson(lesson.id)} className="h-7 w-7 text-destructive hover:bg-red-100"><Trash2 className="h-3.5 w-3.5" /></Button>
+                                                                <Button size="icon" variant="ghost" onClick={() => handleConfirmAddLesson(topic.id, module.id)} disabled={isSavingNewLesson} className="h-10 w-10 text-green-600 hover:scale-110 border-2 border-transparent hover:border-foreground">
+                                                                    {isSavingNewLesson ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                                                                </Button>
+                                                                <Button size="icon" variant="ghost" onClick={() => setAddingLessonToTopicId(null)} className="h-10 w-10 text-destructive border-2 border-transparent hover:border-foreground">
+                                                                    <X className="h-5 w-5" />
+                                                                </Button>
                                                             </div>
                                                         </div>
-                                                    )) : (
+                                                    )}
+
+                                                    {(!topic.lessons || topic.lessons.length === 0) && !addingLessonToTopicId && (
                                                         <p className="text-[10px] font-black opacity-30 italic ml-4">NO CONTENT IN TOPIC</p>
                                                     )}
                                                 </div>
@@ -526,10 +693,10 @@ export function ModuleManager({ courseId }: ModuleManagerProps) {
                 )}
             </div>
 
-            <LessonEditDialog
-                lesson={editingLesson}
-                open={isLessonDialogOpen}
-                onOpenChange={setIsLessonDialogOpen}
+            <QuizEditDialog
+                lesson={editingQuizLesson}
+                open={isQuizDialogOpen}
+                onOpenChange={setIsQuizDialogOpen}
                 onSuccess={fetchData}
             />
         </div>
