@@ -29,15 +29,20 @@ const sidebarItems = [
     },
 ]
 
+import { ThemeToggle } from '@/components/admin/theme-toggle'
+
 export function AdminSidebar() {
     const pathname = usePathname()
 
     return (
-        <div className="flex h-full w-64 flex-col border-r-4 border-foreground bg-white text-foreground">
-            <div className="flex h-16 items-center border-b-4 border-foreground px-6">
+        <div className="flex h-full w-64 flex-col border-r-4 border-foreground bg-background text-foreground">
+            <div className="flex h-16 items-center justify-between border-b-4 border-foreground px-6">
                 <Link href="/" className="flex items-center gap-2 font-black text-xl tracking-tighter">
                     <span className="bg-foreground text-background px-2 py-1 rounded-sm">Edu</span>Admin
                 </Link>
+                <div onClick={(e) => e.stopPropagation()}>
+                    <ThemeToggle />
+                </div>
             </div>
             <div className="flex-1 overflow-y-auto py-6">
                 <nav className="grid items-start px-4 text-sm font-medium">

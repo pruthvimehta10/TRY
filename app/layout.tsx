@@ -49,16 +49,10 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`font-sans antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-        >
-          <UserProvider user={user}>
-            {children}
-            <Analytics />
-          </UserProvider>
-        </ThemeProvider>
+        <UserProvider user={user}>
+          {children}
+          <Analytics />
+        </UserProvider>
       </body>
     </html>
   )

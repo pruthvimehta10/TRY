@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Edit, Trash2, Loader2, X } from 'lucide-react'
+import { Plus, Edit, Trash2, Loader2, X, Layers } from 'lucide-react'
 import { ModuleManager } from '@/components/admin/module-manager'
 
 interface Course {
@@ -95,11 +95,11 @@ export default function AdminCoursesPage() {
                             {courses.map((course) => (
                                 <TableRow
                                     key={course.id}
-                                    className={`font-medium border-b-2 border-slate-100 last:border-0 hover:bg-slate-50 transition-colors ${selectedCourseId === course.id ? 'bg-yellow-50' : ''}`}
+                                    className={`font-medium border-b-2 border-border/50 last:border-0 hover:bg-muted/50 transition-colors ${selectedCourseId === course.id ? 'bg-secondary' : ''}`}
                                 >
                                     <TableCell className="font-bold">{course.title}</TableCell>
                                     <TableCell>
-                                        <Badge variant="outline" className="border-2 border-foreground font-black bg-white uppercase text-[10px]">
+                                        <Badge variant="outline" className="border-2 border-foreground font-black bg-background uppercase text-[10px]">
                                             {course.category}
                                         </Badge>
                                     </TableCell>
@@ -108,20 +108,15 @@ export default function AdminCoursesPage() {
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">
                                             {/* Usable Edit Button: Toggles Module Manager */}
+                                            {/* Usable Edit Button: Toggles Module Manager */}
                                             <Button
                                                 variant="outline"
-                                                size="sm"
+                                                size="icon"
                                                 onClick={() => setSelectedCourseId(selectedCourseId === course.id ? null : course.id)}
-                                                className={`border-2 border-foreground font-black transition-all ${selectedCourseId === course.id ? 'bg-foreground text-white' : 'bg-white text-foreground hover:bg-slate-100'}`}
+                                                className={`h-8 w-8 border-2 border-foreground font-black transition-all ${selectedCourseId === course.id ? 'bg-foreground text-background' : 'bg-background text-foreground hover:bg-muted'}`}
+                                                title="Manage Modules"
                                             >
-                                                {selectedCourseId === course.id ? <X className="mr-1 h-3 w-3" /> : <Edit className="mr-1 h-3 w-3" />}
-                                                {selectedCourseId === course.id ? 'CLOSE' : 'MODULARIZE'}
-                                            </Button>
-
-                                            <Button variant="ghost" size="icon" asChild className="h-8 w-8 border-2 border-transparent hover:border-foreground hover:bg-primary/10">
-                                                <Link href={`/admin/courses/${course.id}`}>
-                                                    <Edit className="h-4 w-4" />
-                                                </Link>
+                                                {selectedCourseId === course.id ? <X className="h-4 w-4" /> : <Layers className="h-4 w-4" />}
                                             </Button>
                                             <Button
                                                 variant="ghost"
@@ -142,13 +137,17 @@ export default function AdminCoursesPage() {
                 {/* Inline Module Manager */}
                 {selectedCourseId && (
                     <div className="animate-in fade-in slide-in-from-top-4 duration-300">
-                        <div className="mb-4 flex items-center justify-between bg-foreground text-white p-3 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                            <h3 className="font-black uppercase tracking-tighter">Managing Modules for: <span className="text-yellow-400">{courses.find(c => c.id === selectedCourseId)?.title}</span></h3>
-                            <Button size="sm" variant="ghost" onClick={() => setSelectedCourseId(null)} className="text-white hover:text-yellow-400 font-black">
-                                <X className="h-4 w-4 mr-1" /> EXIT
-                            </Button>
+                        <div className="mb-4 flex items-center justify-between bg-foreground text-background p-3 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                            <h3 className="font-black uppercase tracking-tighter flex items-center gap-2">
+                                Managing Modules for: <span className="text-yellow-400">{courses.find(c => c.id === selectedCourseId)?.title}</span>
+                            </h3>
+                            <div className="flex items-center gap-2">
+                                <Button size="sm" variant="ghost" onClick={() => setSelectedCourseId(null)} className="text-background hover:text-yellow-400 font-black">
+                                    <X className="h-4 w-4 mr-1" /> EXIT
+                                </Button>
+                            </div>
                         </div>
-                        <div className="p-6 bg-slate-50 border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                        <div className="p-6 bg-background border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
                             <ModuleManager courseId={selectedCourseId} />
                         </div>
                     </div>

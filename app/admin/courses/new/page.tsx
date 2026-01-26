@@ -69,7 +69,7 @@ export default function NewCoursePage() {
                 </p>
             </div>
 
-            <form onSubmit={onSubmit} className="space-y-8 border-4 border-foreground p-8 rounded-xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-white">
+            <form onSubmit={onSubmit} className="space-y-8 border-4 border-foreground p-8 rounded-xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-background">
                 <div className="space-y-2">
                     <Label htmlFor="title" className="font-bold">Course Title</Label>
                     <Input id="title" name="title" required placeholder="e.g. Advanced React Patterns" className="border-2 border-foreground" />

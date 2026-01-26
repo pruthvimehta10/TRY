@@ -70,7 +70,7 @@ export default async function AdminDashboard() {
                         <div className="space-y-4">
                             {activities.length > 0 ? (
                                 activities.map((activity) => (
-                                    <div key={activity.id} className="flex items-center gap-4 border-b-2 border-slate-100 pb-2 last:border-0 last:pb-0">
+                                    <div key={activity.id} className="flex items-center gap-4 border-b-2 border-border/50 last:border-0 last:pb-0">
                                         <div className="h-9 w-9 rounded-full bg-primary/20 border-2 border-foreground flex items-center justify-center font-bold">
                                             {activity.users?.full_name?.charAt(0) || activity.users?.email?.charAt(0) || 'U'}
                                         </div>
