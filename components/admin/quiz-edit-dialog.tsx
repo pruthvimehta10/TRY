@@ -17,17 +17,17 @@ interface QuizQuestion {
 }
 
 interface QuizEditDialogProps {
-    topic: {
+    lesson: {
         id: string
         title: string
-        course_id?: string
+        course_id: string
     } | null
     open: boolean
     onOpenChange: (open: boolean) => void
     onSuccess: () => void
 }
 
-export function QuizEditDialog({ topic, open, onOpenChange, onSuccess }: QuizEditDialogProps) {
+export function QuizEditDialog({ lesson, open, onOpenChange, onSuccess }: QuizEditDialogProps) {
     const supabase = createClient()
     const [loading, setLoading] = useState(false)
     const [fetching, setFetching] = useState(false)
@@ -43,13 +43,13 @@ export function QuizEditDialog({ topic, open, onOpenChange, onSuccess }: QuizEdi
     ])
 
     useEffect(() => {
-        if (open && topic) {
+        if (open && lesson) {
             fetchQuestions()
         }
-    }, [open, topic])
+    }, [open, lesson])
 
     async function fetchQuestions() {
-        if (!topic) return
+        if (!lesson) return
         setFetching(true)
         const { data } = await supabase
             .from('quiz_questions')
@@ -57,7 +57,7 @@ export function QuizEditDialog({ topic, open, onOpenChange, onSuccess }: QuizEdi
                 *,
                 quiz_options (*)
             `)
-            .eq('topic_id', topic.id)
+            .eq('lesson_id', lesson.id)
             .order('question_order')
 
         if (data) {
@@ -68,19 +68,8 @@ export function QuizEditDialog({ topic, open, onOpenChange, onSuccess }: QuizEdi
 
     async function handleAddQuestion(e: React.FormEvent) {
         e.preventDefault()
-        if (!topic) return
+        if (!lesson) return
         setLoading(true)
-
-        // Get course_id if not already available
-        let courseId = topic.course_id
-        if (!courseId) {
-            const { data } = await supabase
-                .from('topics')
-                .select('course_id')
-                .eq('id', topic.id)
-                .single()
-            courseId = data?.course_id
-        }
 
         // 1. Get next order
         const nextOrder = questions.length > 0
@@ -91,8 +80,8 @@ export function QuizEditDialog({ topic, open, onOpenChange, onSuccess }: QuizEdi
         const { data: qData, error: qError } = await supabase
             .from('quiz_questions')
             .insert({
-                course_id: courseId,
-                topic_id: topic.id,
+                lesson_id: lesson.id,
+                course_id: lesson.course_id,
                 question_text: questionText,
                 question_order: nextOrder,
                 question_type: 'multiple_choice'
@@ -106,7 +95,7 @@ export function QuizEditDialog({ topic, open, onOpenChange, onSuccess }: QuizEdi
             return
         }
 
-        // 2. Insert Options
+        // 3. Insert Options
         const optionsToInsert = options.map((opt, idx) => ({
             question_id: qData.id,
             option_text: opt.text,
@@ -151,7 +140,7 @@ export function QuizEditDialog({ topic, open, onOpenChange, onSuccess }: QuizEdi
         setOptions(newOpts)
     }
 
-    if (!topic) return null
+    if (!lesson) return null
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -159,7 +148,7 @@ export function QuizEditDialog({ topic, open, onOpenChange, onSuccess }: QuizEdi
                 <DialogHeader>
                     <DialogTitle className="font-black text-2xl uppercase tracking-tighter flex items-center gap-2">
                         <FileQuestion className="h-6 w-6" />
-                        Quiz Builder: {topic.title}
+                        Quiz Builder: {lesson.title}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -187,9 +176,10 @@ export function QuizEditDialog({ topic, open, onOpenChange, onSuccess }: QuizEdi
                                                 {i + 1}. {q.question_text}
                                             </CardTitle>
                                             <Button 
-                                                size="sm"
-                                                onClick={() => deleteQuestion(q.id)}
-                                                className="h-6 w-6 p-0 text-white bg-destructive hover:bg-destructive/90 dark:text-white dark:bg-destructive dark:hover:bg-destructive/80"
+                                                variant="ghost" 
+                                                size="sm" 
+                                                onClick={() => deleteQuestion(q.id)} 
+                                                className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-red-50"
                                             >
                                                 <Trash2 className="h-3 w-3" />
                                             </Button>
