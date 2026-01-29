@@ -230,9 +230,9 @@ export function CoursePlayer({ courseTitle, lessons, initialLessonId }: CoursePl
                       <div className="flex-shrink-0 mt-1">
                         <Badge className="bg-primary text-primary-foreground">Ex</Badge>
                       </div>
-                      <div className="flex-1 min-w-0 hover:text-white transition-all">
+                      <div className="flex-1 min-w-0 group-hover:text-foreground transition-all">
                         <p className="font-bold text-sm text-foreground">Final Exam</p>
-                        <p className="text-xs mt-1 font-medium text-muted-foreground">Test your knowledge</p>
+                        <p className="text-xs mt-1 font-medium text-muted-foreground group-hover:text-accent-foreground">Test your knowledge</p>
                       </div>
                     </div>
                   </a>
@@ -240,7 +240,7 @@ export function CoursePlayer({ courseTitle, lessons, initialLessonId }: CoursePl
 
                 <TabsContent value="notes" className="p-4 space-y-3">
                   {/* ADD NOTE BUTTON: Clean style + White Text on Hover */}
-                  <Button className="w-full border border-border/20 bg-accent text-accent-foreground font-bold hover:bg-primary hover:text-white transition-all">
+                  <Button className="w-full border border-border/20 bg-accent text-accent-foreground font-bold hover:bg-primary hover:text-white dark:hover:text-white transition-all">
                     + Add Note
                   </Button>
                   <div className="text-center text-sm font-medium py-8 text-muted-foreground">

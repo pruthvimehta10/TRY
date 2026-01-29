@@ -25,29 +25,26 @@ export default function NewCoursePage() {
         const description = formData.get('description') as string
         const level = formData.get('level') as string
 
-        const { data: { user } } = await supabase.auth.getUser()
+        try {
+            const res = await fetch('/api/admin/courses', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, description, level }),
+            })
 
-        if (!user) {
-            alert('You must be logged in to create a course')
-            setLoading(false)
-            return
-        }
+            const result = await res.json()
 
-        const { error } = await supabase.from('courses').insert({
-            title,
-            description,
-            level,
-            instructor_id: user.id,
-            is_published: true, // Default to true for MVP so it shows on homepage
-        })
-
-        if (error) {
+            if (!res.ok) {
+                alert('Error creating course: ' + result.error)
+            } else {
+                // Redirect to courses page with cache bust
+                router.push('/courses?_t=' + Date.now())
+            }
+        } catch (error: any) {
             alert('Error creating course: ' + error.message)
-        } else {
-            router.push('/admin/courses')
-            router.refresh()
+        } finally {
+            setLoading(false)
         }
-        setLoading(false)
     }
 
     return (

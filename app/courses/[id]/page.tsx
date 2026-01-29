@@ -10,12 +10,12 @@ export default async function CoursePage({
     const { id } = await params
     const supabase = await createClient()
 
-    // Fetch course with lessons directly
+    // Fetch course with topics directly
     const { data: course } = await supabase
         .from('courses')
         .select(`
             *,
-            lessons (
+            topics (
                 *,
                 quiz_questions (
                     *,
@@ -54,16 +54,18 @@ export default async function CoursePage({
         )
     }
 
-    // Process lessons to match CoursePlayer interface
-    const lessons = (course.lessons || [])
+    // Process topics to match CoursePlayer interface
+    const lessons = (course.topics || [])
         .sort((a: any, b: any) => a.order_index - b.order_index)
-        .map((lesson: any, index: number) => ({
-            ...lesson,
-            videoUrl: lesson.video_url,
-            duration: lesson.duration || 10,
-            completed: false, // In a real app, fetch 'lesson_completions'
-            isLocked: index !== 0, // Unlock first lesson only for demo
-            questions: (lesson.quiz_questions || [])
+        .map((topic: any, index: number) => ({
+            id: topic.id,
+            title: topic.title,
+            videoUrl: topic.video_url,
+            duration: topic.duration || 10,
+            completed: false, // In a real app, fetch 'topic_completions'
+            isLocked: index !== 0, // Unlock first topic only for demo
+            description: topic.description,
+            questions: (topic.quiz_questions || [])
                 .sort((a: any, b: any) => a.question_order - b.question_order)
                 .map((q: any) => ({
                     id: q.id,
@@ -73,7 +75,7 @@ export default async function CoursePage({
                         .sort((a: any, b: any) => a.option_order - b.option_order)
                         .map((o: any) => o.option_text)
                 }))
-        }))
+        })))
 
     // Note: To get options, we need a deeper join or a second query.
     // Supabase recursive query for options:

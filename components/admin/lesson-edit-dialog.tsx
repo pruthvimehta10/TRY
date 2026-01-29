@@ -25,6 +25,8 @@ export function LessonEditDialog({ lesson, open, onOpenChange, onSuccess }: Less
     const [uploading, setUploading] = useState(false)
     const [uploadProgress, setUploadProgress] = useState(0)
     const [videoUrl, setVideoUrl] = useState('')
+    const [topicId, setTopicId] = useState(lesson?.topic_id || '')
+    const [courses, setCourses] = useState<{ id: string, title: string }[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
     const supabase = createClient()
 
@@ -34,7 +36,16 @@ export function LessonEditDialog({ lesson, open, onOpenChange, onSuccess }: Less
         } else {
             setVideoUrl('')
         }
+        if (lesson?.topic_id) {
+            setTopicId(lesson.topic_id)
+        }
+        fetchCourses()
     }, [lesson])
+
+    async function fetchCourses() {
+        const { data } = await supabase.from('courses').select('id, title').order('title')
+        if (data) setCourses(data)
+    }
 
     async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0]
@@ -91,7 +102,7 @@ export function LessonEditDialog({ lesson, open, onOpenChange, onSuccess }: Less
                 title: formData.get('title') as string,
                 description: formData.get('description') as string,
                 video_url: videoUrl,
-                video_duration_seconds: parseInt(formData.get('duration') as string) * 60 || 0,
+                topic_id: topicId,
             })
             .eq('id', lesson.id)
 
@@ -111,7 +122,7 @@ export function LessonEditDialog({ lesson, open, onOpenChange, onSuccess }: Less
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[525px] border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-background">
                 <DialogHeader>
-                    <DialogTitle className="font-black text-2xl uppercase tracking-tighter">Edit Lesson Content</DialogTitle>
+                    <DialogTitle className="font-black text-2xl uppercase tracking-tighter">Edit Lesson</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4 pt-4">
                     <div className="space-y-2">
@@ -135,21 +146,28 @@ export function LessonEditDialog({ lesson, open, onOpenChange, onSuccess }: Less
                         />
                     </div>
 
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-course" className="font-black uppercase text-xs">Course</Label>
+                        <select
+                            id="edit-course"
+                            name="topic_id"
+                            value={courseId}
+                            onChange={e => setCourseId(e.target.value)}
+                            className="border-2 border-foreground font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] w-full p-2 rounded"
+                            required
+                        >
+                            <option value="" disabled>Select course</option>
+                            {courses.map(c => (
+                                <option key={c.id} value={c.id}>{c.title}</option>
+                            ))}
+                        </select>
+                    </div>
+
                     <div className="space-y-3 bg-secondary/10 p-4 border-2 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                         <Label className="font-black uppercase text-xs flex items-center gap-2">
-                            <VideoIcon className="h-4 w-4" /> Video Source
+                            <VideoIcon className="h-4 w-4" /> Video Upload
                         </Label>
-
                         <div className="space-y-3">
-                            <Input
-                                id="edit-video-url"
-                                name="video_url"
-                                value={videoUrl}
-                                onChange={(e) => setVideoUrl(e.target.value)}
-                                placeholder="Paste video URL or upload below..."
-                                className="border-2 border-foreground bg-background font-bold text-xs"
-                            />
-
                             <div className="relative">
                                 <input
                                     type="file"
@@ -167,7 +185,7 @@ export function LessonEditDialog({ lesson, open, onOpenChange, onSuccess }: Less
                                     {uploading ? (
                                         <><Loader2 className="animate-spin mr-2 h-4 w-4" /> UPLOADING {uploadProgress}%</>
                                     ) : (
-                                        <><Upload className="mr-2 h-4 w-4 stroke-[3px]" /> UPLOAD FROM COMPUTER</>
+                                        <><Upload className="mr-2 h-4 w-4 stroke-[3px]" /> UPLOAD VIDEO</>
                                     )}
                                 </Button>
                                 {uploading && (
@@ -178,20 +196,13 @@ export function LessonEditDialog({ lesson, open, onOpenChange, onSuccess }: Less
                                         />
                                     </div>
                                 )}
+                                {videoUrl && !uploading && (
+                                    <div className="mt-2">
+                                        <video src={videoUrl} controls className="w-full max-h-48 border-2 border-foreground" />
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    </div>
-
-                    <div className="space-y-2 pb-4">
-                        <Label htmlFor="edit-duration" className="font-black uppercase text-xs">Duration (minutes)</Label>
-                        <Input
-                            id="edit-duration"
-                            name="duration"
-                            type="number"
-                            min="0"
-                            defaultValue={lesson.video_duration_seconds ? Math.round(lesson.video_duration_seconds / 60) : 0}
-                            className="border-2 border-foreground font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] w-32"
-                        />
                     </div>
 
                     <DialogFooter className="gap-2 sm:gap-0">

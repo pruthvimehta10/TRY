@@ -46,7 +46,7 @@ export const lessons = [
   // Course 1 Lessons
   {
     id: 'l1-1',
-    course_id: '1',
+    module_id: '1',
     title: 'Introduction to HTML',
     description: 'Understanding the basic structure of a web page.',
     video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
@@ -56,7 +56,7 @@ export const lessons = [
   },
   {
     id: 'l1-2',
-    course_id: '1',
+    module_id: '1',
     title: 'CSS Basics',
     description: 'Styling your web pages with CSS.',
     video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
@@ -66,7 +66,7 @@ export const lessons = [
   },
   {
     id: 'l1-3',
-    course_id: '1',
+    module_id: '1',
     title: 'JavaScript Fundamentals',
     description: 'Adding interactivity to your sites.',
     video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
@@ -74,10 +74,10 @@ export const lessons = [
     order_index: 2,
     is_published: true,
   },
-  // Course 2 Lessons
+  // Module 2 Lessons
   {
     id: 'l2-1',
-    course_id: '2',
+    module_id: '2',
     title: 'Python Syntax',
     description: 'Variables, loops, and functions in Python.',
     video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',

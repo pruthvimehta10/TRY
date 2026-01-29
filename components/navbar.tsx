@@ -31,9 +31,9 @@ export function Navbar() {
             className="flex items-center gap-2 font-black text-xl text-foreground/80"
           >
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-black text-xs shadow-sm">
-              R
+              L
             </div>
-            <span className="hidden sm:inline tracking-tighter">RIIDL</span>
+            <span className="hidden sm:inline tracking-tighter">LMS</span>
           </Link>
 
           {/* Desktop Navigation */}
