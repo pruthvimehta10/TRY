@@ -8,15 +8,18 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { role, username, labid } = await request.json()
+        const { role, sub } = await request.json()
+
+        if (role !== 'admin' && role !== 'client') {
+            return NextResponse.json({ error: 'Invalid role. Must be admin or client' }, { status: 400 })
+        }
 
         const secret = process.env.EXTERNAL_JWT_SECRET || 'test-secret-key-change-in-production'
         const secretKey = new TextEncoder().encode(secret)
 
         const token = await new SignJWT({
-            username: username || `test_${role}`,
-            labid: labid || 'lab_123',
-            role: role || 'student',
+            sub: sub || `test_${role}_id`,
+            role: role,
         })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuedAt()

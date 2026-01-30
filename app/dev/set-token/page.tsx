@@ -10,7 +10,7 @@ import { CheckCircle, AlertCircle } from 'lucide-react'
 
 export default function SetTokenPage() {
     const router = useRouter()
-    // ... rest of the component
+
     // Block access in production for security
     if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_ALLOW_DEV_TOOLS !== 'true') {
         return (
@@ -39,13 +39,20 @@ export default function SetTokenPage() {
         }
 
         try {
-            // Set the cookie
+            // Set the cookie - redundant now as per spec but kept for old flows if any
+            // The prompt says Authorization header is source of truth.
+            // But for local dev via browser, we often need cookies or local storage.
+            // Middleware reads 'auth_token' cookie as fallback.
             document.cookie = `auth_token=${token.trim()}; path=/; max-age=86400`
+
+            // Also set in localStorage for client-side API calls if needed
+            localStorage.setItem('auth_token', token.trim())
+
             setMessage({ type: 'success', text: 'Token set successfully! Redirecting...' })
 
             // Redirect based on role
             setTimeout(() => {
-                const target = (currentRole === 'admin' || currentRole === 'instructor') ? '/admin' : '/'
+                const target = (currentRole === 'admin') ? '/admin' : '/dashboard'
                 console.log('Redirecting to:', target)
                 router.push(target)
             }, 500)
@@ -56,6 +63,7 @@ export default function SetTokenPage() {
 
     const handleClearToken = () => {
         document.cookie = 'auth_token=; path=/; max-age=0'
+        localStorage.removeItem('auth_token')
         setToken('')
         setMessage({ type: 'success', text: 'Token cleared!' })
     }
@@ -68,13 +76,17 @@ export default function SetTokenPage() {
                 body: JSON.stringify({ role })
             })
 
-            if (!response.ok) throw new Error('Failed to generate token')
+            if (!response.ok) {
+                const err = await response.json()
+                throw new Error(err.error || 'Failed to generate token')
+            }
 
             const data = await response.json()
             setToken(data.token)
             setCurrentRole(role)
             setMessage({ type: 'success', text: `Generated ${role} token. Click "Set Token" to apply.` })
         } catch (error) {
+            console.error(error)
             setMessage({ type: 'error', text: 'Failed to generate token. Make sure dev mode is enabled.' })
         }
     }
@@ -93,7 +105,7 @@ export default function SetTokenPage() {
                     <CardHeader>
                         <CardTitle className="font-black">Quick Generate</CardTitle>
                         <CardDescription className="font-semibold">
-                            Generate and set a test token with predefined roles
+                            Generate and set a test token with RBAC roles
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -105,16 +117,10 @@ export default function SetTokenPage() {
                                 Generate Admin Token
                             </Button>
                             <Button
-                                onClick={() => generateTestToken('instructor')}
+                                onClick={() => generateTestToken('client')}
                                 className="border-4 border-foreground bg-secondary text-secondary-foreground font-black"
                             >
-                                Generate Instructor Token
-                            </Button>
-                            <Button
-                                onClick={() => generateTestToken('student')}
-                                className="border-4 border-foreground bg-accent text-accent-foreground font-black"
-                            >
-                                Generate Student Token
+                                Generate Client Token
                             </Button>
                         </div>
                     </CardContent>
@@ -163,29 +169,6 @@ export default function SetTokenPage() {
                                 </AlertDescription>
                             </Alert>
                         )}
-                    </CardContent>
-                </Card>
-
-                <Card className="border-4 border-foreground shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-                    <CardHeader>
-                        <CardTitle className="font-black">CLI Token Generation</CardTitle>
-                        <CardDescription className="font-semibold">
-                            Generate tokens from the command line
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <pre className="bg-slate-900 text-green-400 p-4 rounded border-2 border-foreground overflow-x-auto">
-                            <code className="text-sm">
-                                {`# Generate admin token
-node scripts/generate-test-token.js admin
-
-# Generate instructor token  
-node scripts/generate-test-token.js instructor test_instructor lab_456
-
-# Generate student token
-node scripts/generate-test-token.js student john_doe lab_123`}
-                            </code>
-                        </pre>
                     </CardContent>
                 </Card>
 

@@ -28,9 +28,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             authenticated: true,
             user: {
-                username: payload.username,
+                userId: payload.sub,
                 role: payload.role,
-                labid: payload.labid,
             },
             claims: payload // Return full payload for debugging/inspection
         })
