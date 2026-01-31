@@ -46,6 +46,7 @@ export default function AdminCoursesPage() {
             return
         }
 
+<<<<<<< Updated upstream
         try {
             console.log('Starting course deletion for:', id)
 
@@ -66,6 +67,17 @@ export default function AdminCoursesPage() {
             console.log('Course deletion result:', result)
 
             // Remove from local state
+=======
+        // Use API route with Service Role to bypass RLS
+        const res = await fetch(`/api/courses/${id}`, {
+            method: 'DELETE'
+        })
+
+        if (!res.ok) {
+            const err = await res.json()
+            alert('Error deleting course: ' + (err.error || 'Unknown error'))
+        } else {
+>>>>>>> Stashed changes
             setCourses(courses.filter(c => c.id !== id))
             
             // Show success message

@@ -1,6 +1,14 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { CoursePlayer } from '@/components/course-player'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
+
+// Use Service Role Key to ensure we can fetch data regardless of RLS state, 
+// then we implement manual access control logic.
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export default async function CoursePage({
     params,
@@ -8,41 +16,56 @@ export default async function CoursePage({
     params: Promise<{ id: string }>
 }) {
     const { id } = await params
-    const supabase = await createClient()
 
-    // 1. Fetch course details first (without join to avoid FK error)
+    // 1. Fetch course details
     const { data: course, error: courseError } = await supabase
         .from('courses')
-        .select('*')
+        .select(`
+            *,
+            course_labs (lab_id)
+        `)
         .eq('id', id)
         .single()
 
-    if (courseError) {
+    if (courseError || !course) {
         console.error("Error fetching course:", courseError);
-    }
-
-    if (!course) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
                 <div className="text-center">
                     <h1 className="text-4xl font-black mb-4">404</h1>
                     <p className="text-xl">Course not found</p>
-                    {courseError && (
-                        <pre className="text-left bg-gray-100 p-4 rounded mt-4 text-xs text-red-500 overflow-auto max-w-lg mx-auto">
-                            DEBUG INFO:
-                            ID: {id}
-                            Error: {JSON.stringify(courseError, null, 2)}
-                        </pre>
-                    )}
                 </div>
             </div>
         )
     }
 
-    // 2. Fetch topics separately
-    // We try to fetch deeply rooted questions too. 
-    // If this fails due to topics -> quiz_questions FK missing (unlikely?), we might need another split.
-    // Assuming only courses -> topics FK is missing based on error 'courses' and 'topics'.
+    // 2. Access Control (Lab ID Check)
+    const headersList = await headers();
+    const userLabId = headersList.get('x-lab-id');
+
+    if (userLabId) {
+        // If the user belongs to a lab, verify the course is assigned to that lab OR is public?
+        // Logic: specific lab users should only see courses assigned to their lab.
+        // The course might be in multiple labs.
+        const assignedLabIds = (course.course_labs || []).map((cl: any) => cl.lab_id);
+        const isAssigned = assignedLabIds.includes(userLabId);
+
+        // Fallback: If course has legacy lab_id column match
+        const isLegacyMatch = course.lab_id && course.lab_id === userLabId;
+
+        if (!isAssigned && !isLegacyMatch) {
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-white text-foreground">
+                    <div className="text-center">
+                        <h1 className="text-4xl font-black mb-4">Access Denied</h1>
+                        <p className="text-xl">This course is not available for your lab ({userLabId}).</p>
+                    </div>
+                </div>
+            )
+        }
+    }
+
+    // 3. Fetch Topics (renamed from lessons)
     const { data: topicsData, error: topicsError } = await supabase
         .from('topics')
         .select(`
@@ -58,33 +81,18 @@ export default async function CoursePage({
 
     if (topicsError) {
         console.error("Error fetching topics:", topicsError)
+        // We continue, possibly showing empty course
     }
 
-    // Verify labid from JWT matches course's lab_id
-    const { headers } = await import('next/headers');
-    const headersList = await headers();
-    const userLabId = headersList.get('x-lab-id') || '';
-
-    // If course has a lab_id, verify it matches the user's lab_id
-    if (course.lab_id && course.lab_id !== userLabId) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-white text-foreground">
-                <div className="text-center">
-                    <h1 className="text-4xl font-black mb-4">Access Denied</h1>
-                    <p className="text-xl">This course is not available for your lab.</p>
-                </div>
-            </div>
-        )
-    }
-
-    // Process topics to match CoursePlayer interface
+    // 4. Process topics for player
     const topics = (topicsData || [])
         .map((topic: any, index: number) => ({
             ...topic,
-            videoUrl: topic_url_safe(topic),
-            duration: topic.duration || 10,
-            completed: false, // In a real app, fetch 'topic_completions'
-            isLocked: index !== 0, // Unlock first topic only for demo
+            // Handle mismatched field names if any (DB topics might have video_url or similar)
+            videoUrl: topic.video_url || "",
+            duration: topic.video_duration_seconds ? Math.round(topic.video_duration_seconds / 60) : (topic.duration || 10),
+            completed: false, // In a real app, fetch completions
+            isLocked: index !== 0,
             questions: (topic.quiz_questions || [])
                 .sort((a: any, b: any) => a.question_order - b.question_order)
                 .map((q: any) => {
@@ -126,9 +134,4 @@ export default async function CoursePage({
             initialTopicId={topics[0]?.id || ''}
         />
     )
-}
-
-function topic_url_safe(topic: any) {
-    if (topic.video_url) return topic.video_url
-    return ""
 }

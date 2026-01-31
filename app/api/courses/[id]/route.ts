@@ -1,5 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+
+// Use Service Role Key to bypass RLS for Admin actions
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export async function GET(
   req: NextRequest,
@@ -8,8 +14,6 @@ export async function GET(
   const { id } = await params
 
   try {
-    const supabase = await createClient()
-
     // 1. Fetch course only
     const { data: course, error: courseError } = await supabase
       .from('courses')
@@ -25,27 +29,49 @@ export async function GET(
       return NextResponse.json({ error: 'Course not found' }, { status: 404 })
     }
 
-    // 2. Fetch lessons separately
-    const { data: lessons, error: lessonsError } = await supabase
-      .from('lessons')
+    // 2. Fetch topics separately (renamed from lessons)
+    const { data: topics, error: topicsError } = await supabase
+      .from('topics')
       .select('*, quiz_questions(*)')
       .eq('course_id', id)
-      .order('order_index') // Using order() here is fine for direct table query
+      .order('order_index')
 
-    if (lessonsError) {
-      // We log but don't fail the whole request? Or maybe we should.
-      // Let's fail for consistency.
-      console.error("Error fetching lessons:", lessonsError)
-      return NextResponse.json({ error: 'Failed to fetch lessons' }, { status: 400 })
+    if (topicsError) {
+      console.error("Error fetching topics:", topicsError)
+      // Return partial data or empty topics?
     }
 
     // Combine manually
     const result = {
       ...course,
-      lessons: lessons || []
+      topics: topics || []
     }
 
     return NextResponse.json(result)
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  try {
+    const { error } = await supabase
+      .from('courses')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    return NextResponse.json({ success: true })
   } catch (error: any) {
     return NextResponse.json(
       { error: 'Internal server error' },
