@@ -16,7 +16,8 @@ interface QuizQuestion {
     quiz_options: { id: string, option_text: string, is_correct: boolean, option_order: number }[]
 }
 
-interface QuizEditDialogProps {
+// Renamed interface to match component
+interface QuizBuilderProps {
     lesson: {
         id: string
         title: string
@@ -27,13 +28,14 @@ interface QuizEditDialogProps {
     onSuccess: () => void
 }
 
-export function QuizEditDialog({ lesson, open, onOpenChange, onSuccess }: QuizEditDialogProps) {
+// Renamed function from QuizEditDialog to QuizBuilder
+export function QuizBuilder({ lesson, open, onOpenChange, onSuccess }: QuizBuilderProps) {
     const supabase = createClient()
     const [loading, setLoading] = useState(false)
     const [fetching, setFetching] = useState(false)
     const [questions, setQuestions] = useState<QuizQuestion[]>([])
 
-    // Form state for new question
+    // --- Form State for the "Next" Question ---
     const [questionText, setQuestionText] = useState('')
     const [options, setOptions] = useState([
         { text: '', correct: true },
@@ -71,7 +73,7 @@ export function QuizEditDialog({ lesson, open, onOpenChange, onSuccess }: QuizEd
         if (!lesson) return
         setLoading(true)
 
-        // 1. Get next order
+        // 1. Calculate Order
         const nextOrder = questions.length > 0
             ? Math.max(...questions.map(q => q.question_order)) + 1
             : 0
@@ -110,14 +112,15 @@ export function QuizEditDialog({ lesson, open, onOpenChange, onSuccess }: QuizEd
         if (oError) {
             alert('Error creating options: ' + oError.message)
         } else {
-            // Reset form
-            setQuestionText('')
-            setOptions([
+            // --- SUCCESS: RESET FORM FOR NEXT QUESTION ---
+            setQuestionText('') // Clear question
+            setOptions([        // Reset options to default blanks
                 { text: '', correct: true },
                 { text: '', correct: false },
                 { text: '', correct: false },
                 { text: '', correct: false },
             ])
+            // Refresh the list on the left immediately
             fetchQuestions()
         }
         setLoading(false)
@@ -144,42 +147,48 @@ export function QuizEditDialog({ lesson, open, onOpenChange, onSuccess }: QuizEd
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-background">
-                <DialogHeader>
+            {/* Main Dialog Container */}
+            <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-hidden flex flex-col border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-background">
+                
+                <DialogHeader className="px-1">
                     <DialogTitle className="font-black text-2xl uppercase tracking-tighter flex items-center gap-2 text-foreground">
                         <FileQuestion className="h-6 w-6" />
                         Quiz Builder: {lesson.title}
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="grid gap-6 md:grid-cols-2 pt-4">
-                    {/* Left: Existing Questions List */}
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <Label className="font-black uppercase text-xs text-foreground">Questions ({questions.length})</Label>
-                        </div>
-                        {fetching ? (
-                            <div className="flex justify-center py-8">
-                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                            </div>
-                        ) : questions.length === 0 ? (
-                            <div className="p-6 border-4 border-dashed border-foreground/20 text-center text-muted-foreground">
-                                <p className="text-xs font-black uppercase">No questions yet</p>
-                                <p className="text-[10px] mt-1">Add one on the right →</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                                {questions.map((q, i) => (
+                {/* Content Grid: Left (List) & Right (Form) */}
+                <div className="grid gap-6 md:grid-cols-2 pt-4 overflow-hidden h-full">
+                    
+                    {/* LEFT SIDE: Question List */}
+                    <div className="flex flex-col h-full overflow-hidden space-y-2">
+                        <Label className="font-black uppercase text-xs text-foreground">
+                            Existing Questions ({questions.length})
+                        </Label>
+                        
+                        <div className="flex-1 overflow-y-auto pr-2 space-y-3 pb-4">
+                            {fetching ? (
+                                <div className="flex justify-center py-8">
+                                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                </div>
+                            ) : questions.length === 0 ? (
+                                <div className="p-6 border-4 border-dashed border-foreground/20 text-center text-muted-foreground rounded-lg">
+                                    <p className="text-xs font-black uppercase">No questions yet</p>
+                                    <p className="text-[10px] mt-1">Fill out the form to add one →</p>
+                                </div>
+                            ) : (
+                                questions.map((q, i) => (
                                     <Card key={q.id} className="border-2 border-foreground shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bg-card">
-                                        <CardHeader className="flex flex-row items-center justify-between py-2 px-3">
-                                            <CardTitle className="text-xs font-black text-foreground">
-                                                {i + 1}. {q.question_text}
+                                        <CardHeader className="flex flex-row items-start justify-between py-2 px-3 space-y-0">
+                                            <CardTitle className="text-xs font-black text-foreground leading-tight mt-1">
+                                                <span className="text-muted-foreground mr-1">#{i + 1}</span> 
+                                                {q.question_text}
                                             </CardTitle>
                                             <Button 
                                                 variant="ghost" 
                                                 size="sm" 
                                                 onClick={() => deleteQuestion(q.id)} 
-                                                className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-red-500/20 dark:hover:bg-red-500/10"
+                                                className="h-6 w-6 p-0 -mr-2 text-muted-foreground hover:text-destructive hover:bg-transparent"
                                             >
                                                 <Trash2 className="h-3 w-3" />
                                             </Button>
@@ -188,29 +197,31 @@ export function QuizEditDialog({ lesson, open, onOpenChange, onSuccess }: QuizEd
                                             <ul className="space-y-1 text-[10px]">
                                                 {q.quiz_options?.sort((a, b) => a.option_order - b.option_order).map(opt => (
                                                     <li key={opt.id} className={cn(
-                                                        "font-bold pl-2",
-                                                        opt.is_correct ? "text-green-600 dark:text-green-400" : "text-foreground"
+                                                        "font-bold pl-2 border-l-2",
+                                                        opt.is_correct 
+                                                            ? "border-green-500 text-green-700 dark:text-green-400" 
+                                                            : "border-transparent text-muted-foreground"
                                                     )}>
-                                                        • {opt.option_text} {opt.is_correct && "✓"}
+                                                        {opt.option_text} {opt.is_correct && "✓"}
                                                     </li>
                                                 ))}
                                             </ul>
                                         </CardContent>
                                     </Card>
-                                ))}
-                            </div>
-                        )}
+                                ))
+                            )}
+                        </div>
                     </div>
 
-                    {/* Right: Add New Question Form */}
+                    {/* RIGHT SIDE: Add Question Form */}
                     <div className="flex flex-col h-full overflow-y-auto pr-1">
-                        <Label className="font-black uppercase text-xs text-foreground  mb-2">Add New Question</Label>
-                        <Card className="border-2 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] bg-card">
+                        <Label className="font-black uppercase text-xs text-foreground mb-2">Add New Question</Label>
+                        <Card className="border-2 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] bg-card mb-4">
                             <CardContent className="p-4 space-y-4">
                                 <form onSubmit={handleAddQuestion} className="space-y-4">
+                                    {/* Question Input */}
                                     <div className="space-y-2">
-                                        <Label htmlFor="qtext" className="font-black uppercase text-xs text-background
-                                            bg-foreground">
+                                        <Label htmlFor="qtext" className="font-black uppercase text-xs text-foreground">
                                             Question Text
                                         </Label>
                                         <Input
@@ -218,15 +229,16 @@ export function QuizEditDialog({ lesson, open, onOpenChange, onSuccess }: QuizEd
                                             value={questionText}
                                             onChange={e => setQuestionText(e.target.value)}
                                             required
-                                            placeholder="e.g. What is a component?"
-                                            // FIX: Forced Black text on White background regardless of theme
-                                            className="border-2 border-foreground bg-white text-black placeholder:text-zinc-500 font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                                            placeholder="e.g. What is React?"
+                                            // Dark Mode: White paper look
+                                            className="border-2 border-foreground bg-background text-foreground font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] dark:bg-white dark:text-black dark:border-black dark:placeholder:text-zinc-500"
                                         />
                                     </div>
 
+                                    {/* Options Inputs */}
                                     <div className="space-y-2">
-                                        <Label className="font-black uppercase text-xs text-background bg-foreground">
-                                            Options (Select the correct one)
+                                        <Label className="font-black uppercase text-xs text-foreground">
+                                            Options (Select correct answer)
                                         </Label>
                                         <RadioGroup 
                                             value={options.findIndex(o => o.correct).toString()} 
@@ -237,17 +249,20 @@ export function QuizEditDialog({ lesson, open, onOpenChange, onSuccess }: QuizEd
                                                     <RadioGroupItem 
                                                         value={idx.toString()} 
                                                         id={`opt-${idx}`} 
-                                                        className="border-2 border-foreground text-foreground" 
+                                                        // Ensure visible in dark mode
+                                                        className="border-2 border-foreground text-foreground bg-transparent" 
                                                     />
                                                     <Input
                                                         value={opt.text}
                                                         onChange={e => updateOptionText(idx, e.target.value)}
                                                         required
                                                         placeholder={`Option ${idx + 1}`}
-                                                        // FIX: Forced Black text on White background regardless of theme
+                                                        // Dark Mode: White paper look with green highlight support
                                                         className={cn(
-                                                            "border-2 border-foreground flex-1 text-xs font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bg-white text-black placeholder:text-zinc-500",
-                                                            opt.correct ? 'bg-green-100 border-green-600' : ''
+                                                            "border-2 border-foreground flex-1 text-xs font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bg-background text-foreground dark:bg-white dark:text-black dark:border-black dark:placeholder:text-zinc-500",
+                                                            opt.correct 
+                                                                ? 'bg-green-500/20 border-green-600 dark:bg-green-100 dark:border-green-800' 
+                                                                : ''
                                                         )}
                                                     />
                                                 </div>
@@ -255,13 +270,15 @@ export function QuizEditDialog({ lesson, open, onOpenChange, onSuccess }: QuizEd
                                         </RadioGroup>
                                     </div>
 
+                                    {/* Submit Button */}
                                     <Button 
                                         type="submit" 
                                         disabled={loading} 
+                                        // Always Black Text for contrast against Yellow
                                         className="w-full border-2 border-foreground bg-yellow-400 text-black font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all"
                                     >
                                         {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-                                        ADD QUESTION
+                                        ADD & NEXT
                                     </Button>
                                 </form>
                             </CardContent>
