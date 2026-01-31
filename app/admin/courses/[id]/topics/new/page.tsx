@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, Loader2, Upload } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { use } from 'react'
+import { QuizBuilder } from '@/components/admin/quiz-builder'
 
 export default function NewTopicPage({ params }: { params: Promise<{ id: string }> }) {
     const { id: courseId } = use(params)
@@ -18,6 +19,7 @@ export default function NewTopicPage({ params }: { params: Promise<{ id: string 
     const [uploading, setUploading] = useState(false)
     const [uploadProgress, setUploadProgress] = useState(0)
     const [videoUrl, setVideoUrl] = useState('')
+    const [quizQuestions, setQuizQuestions] = useState<any[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
     const supabase = createClient()
 
@@ -88,27 +90,41 @@ export default function NewTopicPage({ params }: { params: Promise<{ id: string 
         const nextOrder = (existingTopics?.[0]?.order_index ?? -1) + 1
 
         // 2. Insert new topic
-        const { error } = await supabase.from('topics').insert({
+        const { data: newTopic, error: topicError } = await supabase.from('topics').insert({
             course_id: courseId,
             title,
             description,
             video_url: videoUrl,
             order_index: nextOrder,
-        })
+        }).select().single()
 
-        if (error && error.code === '42703') {
-            alert('Error creating topic (Column mismatch?): ' + error.message)
-        } else if (error) {
-            alert('Error creating topic: ' + error.message)
+        if (topicError && topicError.code === '42703') {
+            alert('Error creating topic (Column mismatch?): ' + topicError.message)
+        } else if (topicError) {
+            alert('Error creating topic: ' + topicError.message)
         } else {
-            const action = formData.get('action') as string
-            if (action === 'save-quiz') {
-                // Redirect to quiz creation for the new topic
-                // Note: You'll need to get the new topic ID, this is simplified
-                router.push(`/admin/courses/${courseId}`)
-            } else {
-                router.push(`/admin/courses/${courseId}`)
+            // 3. Insert quiz questions if any
+            if (quizQuestions.length > 0 && newTopic) {
+                const questionsToInsert = quizQuestions.map((q, index) => ({
+                    topic_id: newTopic.id,
+                    question: q.question,
+                    options: q.options,
+                    correct_answer: q.correctAnswer,
+                    question_order: index,
+                    question_type: 'multiple_choice'
+                }))
+
+                const { error: quizError } = await supabase
+                    .from('quiz_questions')
+                    .insert(questionsToInsert)
+
+                if (quizError) {
+                    console.error('Error saving quiz questions:', quizError)
+                    alert('Topic created but quiz questions failed to save: ' + quizError.message)
+                }
             }
+
+            router.push(`/admin/courses/${courseId}`)
             router.refresh()
         }
         setLoading(false)
@@ -131,19 +147,19 @@ export default function NewTopicPage({ params }: { params: Promise<{ id: string 
                 </p>
             </div>
 
-            <form onSubmit={onSubmit} className="space-y-8 border-4 border-foreground p-8 rounded-xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-white">
+            <form onSubmit={onSubmit} className="space-y-8 border-4 border-foreground p-8 rounded-xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-background">
                 <div className="space-y-2">
-                    <Label htmlFor="title" className="font-bold">Topic Title</Label>
-                    <Input id="title" name="title" required placeholder="e.g. Introduction to React" className="border-2 border-foreground" />
+                    <Label htmlFor="title" className="font-bold text-foreground">Topic Title</Label>
+                    <Input id="title" name="title" required placeholder="e.g. Introduction to React" className="border-2 border-foreground bg-background text-foreground placeholder:text-muted-foreground" />
                 </div>
 
                 <div className="space-y-2">
-                    <Label htmlFor="description" className="font-bold">Description</Label>
-                    <Textarea id="description" name="description" placeholder="Brief summary of what this topic covers..." className="border-2 border-foreground min-h-[100px]" />
+                    <Label htmlFor="description" className="font-bold text-foreground">Description</Label>
+                    <Textarea id="description" name="description" placeholder="Brief summary of what this topic covers..." className="border-2 border-foreground min-h-[100px] bg-background text-foreground placeholder:text-muted-foreground" />
                 </div>
 
-                <div className="space-y-3 bg-secondary/10 p-4 border-2 border-foreground rounded-xl">
-                    <Label className="font-bold flex items-center gap-2">
+                <div className="space-y-3 bg-secondary/20 p-4 border-2 border-foreground rounded-xl">
+                    <Label className="font-bold text-foreground flex items-center gap-2">
                         <Upload className="h-4 w-4" /> Video Upload
                     </Label>
 
@@ -176,12 +192,14 @@ export default function NewTopicPage({ params }: { params: Promise<{ id: string 
                             </div>
                         )}
                         {videoUrl && !uploading && (
-                            <div className="p-3 bg-green-50 border-2 border-green-500 rounded-lg">
-                                <p className="text-sm font-bold text-green-800">✅ Video uploaded successfully</p>
+                            <div className="p-3 bg-green-500/20 border-2 border-green-500 rounded-lg">
+                                <p className="text-sm font-bold text-green-600 dark:text-green-400">✅ Video uploaded successfully</p>
                             </div>
                         )}
                     </div>
                 </div>
+
+                <QuizBuilder onQuestionsChange={setQuizQuestions} />
 
                 <div className="pt-4 flex justify-end gap-4">
                     <Button type="button" variant="ghost" asChild className="font-bold">
@@ -189,23 +207,11 @@ export default function NewTopicPage({ params }: { params: Promise<{ id: string 
                     </Button>
                     <Button
                         type="submit"
-                        name="action"
-                        value="save"
                         disabled={loading}
-                        className="border-4 border-foreground bg-white text-foreground hover:bg-gray-100 font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                        className="border-4 border-foreground bg-background text-foreground hover:bg-secondary font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
                     >
                         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Save Topic
-                    </Button>
-                    <Button
-                        type="submit"
-                        name="action"
-                        value="save-quiz"
-                        disabled={loading}
-                        className="border-4 border-foreground bg-primary text-primary-foreground font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-                    >
-                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Save & Add Quiz
                     </Button>
                 </div>
             </form>
