@@ -39,12 +39,12 @@ export default async function CoursePage({
         )
     }
 
-    // 2. Fetch lessons separately
+    // 2. Fetch topics separately
     // We try to fetch deeply rooted questions too. 
-    // If this fails due to lessons -> quiz_questions FK missing (unlikely?), we might need another split.
-    // Assuming only courses -> lessons FK is missing based on error 'courses' and 'lessons'.
-    const { data: lessonsData, error: lessonsError } = await supabase
-        .from('lessons')
+    // If this fails due to topics -> quiz_questions FK missing (unlikely?), we might need another split.
+    // Assuming only courses -> topics FK is missing based on error 'courses' and 'topics'.
+    const { data: topicsData, error: topicsError } = await supabase
+        .from('topics')
         .select(`
             *,
             quiz_questions (
@@ -55,8 +55,8 @@ export default async function CoursePage({
         .eq('course_id', id)
         .order('order_index')
 
-    if (lessonsError) {
-        console.error("Error fetching lessons:", lessonsError)
+    if (topicsError) {
+        console.error("Error fetching topics:", topicsError)
     }
 
     // Verify labid from JWT matches course's lab_id
@@ -76,36 +76,43 @@ export default async function CoursePage({
         )
     }
 
-    // Process lessons to match CoursePlayer interface
-    const lessons = (lessonsData || [])
-        .map((lesson: any, index: number) => ({
-            ...lesson,
-            videoUrl: lesson_url_safe(lesson),
-            duration: lesson.duration || 10,
-            completed: false, // In a real app, fetch 'lesson_completions'
-            isLocked: index !== 0, // Unlock first lesson only for demo
-            questions: (lesson.quiz_questions || [])
+    // Process topics to match CoursePlayer interface
+    const topics = (topicsData || [])
+        .map((topic: any, index: number) => ({
+            ...topic,
+            videoUrl: topic_url_safe(topic),
+            duration: topic.duration || 10,
+            completed: false, // In a real app, fetch 'topic_completions'
+            isLocked: index !== 0, // Unlock first topic only for demo
+            questions: (topic.quiz_questions || [])
                 .sort((a: any, b: any) => a.question_order - b.question_order)
-                .map((q: any) => ({
-                    id: q.id,
-                    question: q.question_text,
-                    correctAnswer: q.correct_answer_index,
-                    options: (q.quiz_options || [])
+                .map((q: any) => {
+                    const options = (q.quiz_options || [])
                         .sort((a: any, b: any) => a.option_order - b.option_order)
                         .map((o: any) => o.option_text)
-                })),
+                    
+                    const correctAnswer = (q.quiz_options || [])
+                        .findIndex((o: any) => o.is_correct)
+                    
+                    return {
+                        id: q.id,
+                        question: q.question_text,
+                        correctAnswer: correctAnswer >= 0 ? correctAnswer : 0,
+                        options
+                    }
+                }),
         }));
 
     return (
         <CoursePlayer
             courseTitle={course.title}
-            lessons={lessons}
-            initialLessonId={lessons[0]?.id || ''}
+            topics={topics}
+            initialTopicId={topics[0]?.id || ''}
         />
     )
 }
 
-function lesson_url_safe(lesson: any) {
-    if (lesson.video_url) return lesson.video_url
+function topic_url_safe(topic: any) {
+    if (topic.video_url) return topic.video_url
     return ""
 }

@@ -79,8 +79,16 @@ export function LessonQuizModal({
       setScore(0)
       onClose()
     } else {
+      // Allow closing without submitting (user can retake later)
       onClose()
     }
+  }
+
+  const handleRetake = () => {
+    setCurrentQuestion(0)
+    setSelectedAnswers([])
+    setSubmitted(false)
+    setScore(0)
   }
 
   if (!question && !submitted) return null
@@ -90,8 +98,8 @@ export function LessonQuizModal({
       <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Lesson Quiz: {lessonTitle}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-2xl font-black">Lesson Quiz: {lessonTitle}</DialogTitle>
+            <DialogDescription className="text-base font-semibold">
               Question {currentQuestion + 1} of {questions.length}
             </DialogDescription>
           </DialogHeader>
@@ -99,15 +107,15 @@ export function LessonQuizModal({
           <div className="space-y-6 py-4">
             {/* Progress Bar */}
             <div className="space-y-2">
-              <div className="flex justify-between text-sm text-muted-foreground">
+              <div className="flex justify-between text-sm font-bold text-muted-foreground">
                 <span>Progress</span>
                 <span>
                   {currentQuestion + 1}/{questions.length}
                 </span>
               </div>
-              <div className="h-2 bg-secondary rounded-full overflow-hidden">
+              <div className="h-3 bg-secondary rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-primary transition-all"
+                  className="h-full bg-primary transition-all duration-300"
                   style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
                 />
               </div>
@@ -115,7 +123,7 @@ export function LessonQuizModal({
 
             {/* Question */}
             <div>
-              <h3 className="text-lg font-semibold text-foreground mb-4">{question.question}</h3>
+              <h3 className="text-xl font-black text-foreground mb-6">{question.question}</h3>
 
               {/* Options */}
               <RadioGroup
@@ -128,7 +136,7 @@ export function LessonQuizModal({
                       <RadioGroupItem value={index.toString()} id={`option-${index}`} />
                       <Label
                         htmlFor={`option-${index}`}
-                        className="flex-1 cursor-pointer p-3 rounded-lg border border-border hover:bg-secondary/50 transition-colors"
+                        className="flex-1 cursor-pointer p-4 rounded-xl border-2 border-border hover:bg-secondary/50 hover:border-primary/50 transition-all font-semibold"
                       >
                         {option}
                       </Label>
@@ -144,15 +152,16 @@ export function LessonQuizModal({
                 variant="outline"
                 onClick={() => setCurrentQuestion(Math.max(0, currentQuestion - 1))}
                 disabled={currentQuestion === 0}
+                className="font-bold"
               >
                 Previous
               </Button>
               <Button
                 onClick={handleNext}
                 disabled={selectedAnswers[currentQuestion] === undefined}
-                className="flex-1"
+                className="flex-1 font-black"
               >
-                {isLastQuestion ? 'Submit' : 'Next'}
+                {isLastQuestion ? 'Submit Quiz' : 'Next Question'}
               </Button>
             </div>
           </div>
@@ -167,45 +176,64 @@ export function LessonQuizModal({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Quiz Results</DialogTitle>
+          <DialogTitle className="text-2xl font-black">Quiz Results</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 py-4 text-center">
           <div className="flex justify-center">
             {isPassed ? (
-              <CheckCircle className="h-16 w-16 text-green-600" />
+              <CheckCircle className="h-20 w-20 text-green-600" />
             ) : (
-              <XCircle className="h-16 w-16 text-destructive" />
+              <XCircle className="h-20 w-20 text-destructive" />
             )}
           </div>
 
           <div>
-            <h3 className="text-3xl font-bold text-foreground">{score}%</h3>
-            <p className="text-lg text-muted-foreground mt-2">
-              {isPassed ? '🎉 Great job! You passed!' : 'You can retake this quiz'}
+            <h3 className="text-4xl font-black text-foreground">{score}%</h3>
+            <p className="text-lg font-bold text-muted-foreground mt-3">
+              {isPassed ? '🎉 Congratulations! You passed!' : '😔 You need 70% to pass'}
             </p>
           </div>
 
-          <Card className="bg-secondary/50">
+          <Card className="bg-secondary/50 border-2">
             <CardContent className="pt-6">
-              <div className="space-y-2 text-sm">
+              <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Correct Answers:</span>
-                  <span className="font-semibold">
+                  <span className="font-bold text-muted-foreground">Correct Answers:</span>
+                  <span className="font-black text-foreground">
                     {Math.round((score / 100) * questions.length)}/{questions.length}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Passing Score:</span>
-                  <span className="font-semibold">70%</span>
+                  <span className="font-bold text-muted-foreground">Passing Score:</span>
+                  <span className="font-black text-foreground">70%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold text-muted-foreground">Your Score:</span>
+                  <span className={`font-black ${isPassed ? 'text-green-600' : 'text-destructive'}`}>
+                    {score}%
+                  </span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Button onClick={handleClose} className="w-full">
-            {isPassed ? 'Continue to Next Lesson' : 'Retake Quiz'}
-          </Button>
+          <div className="flex flex-col gap-2">
+            {isPassed ? (
+              <Button onClick={handleClose} className="w-full font-black">
+                Continue to Next Lesson
+              </Button>
+            ) : (
+              <>
+                <Button onClick={handleRetake} className="w-full font-black">
+                  Retake Quiz
+                </Button>
+                <Button onClick={handleClose} variant="outline" className="w-full font-bold">
+                  Review Lesson
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

@@ -42,10 +42,44 @@ export function CoursePlayer({ courseTitle, topics, initialTopicId }: CoursePlay
     }
   }, [currentTopic, topics, initialTopicId])
 
+  // Prevent playback rate changes and enforce normal speed
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    // Lock playback rate to 1.0 (normal speed)
+    const enforcePlaybackRate = () => {
+      if (video.playbackRate !== 1.0) {
+        video.playbackRate = 1.0
+      }
+    }
+
+    // Monitor and prevent rate changes
+    video.addEventListener('ratechange', enforcePlaybackRate)
+    video.playbackRate = 1.0
+
+    // Prevent seeking (dragging timeline)
+    const preventSeek = (e: Event) => {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+
+    video.addEventListener('seeking', preventSeek)
+    video.addEventListener('seeked', preventSeek)
+
+    return () => {
+      video.removeEventListener('ratechange', enforcePlaybackRate)
+      video.removeEventListener('seeking', preventSeek)
+      video.removeEventListener('seeked', preventSeek)
+    }
+  }, [currentTopic])
 
   const handleVideoEnd = () => {
     setIsVideoEnded(true)
-    setShowQuizPrompt(true)
+    // Automatically open quiz modal when video ends
+    if (currentTopic?.questions && currentTopic.questions.length > 0) {
+      setIsQuizOpen(true)
+    }
   }
 
   const handleTopicClick = (topicId: string) => {
@@ -72,8 +106,14 @@ export function CoursePlayer({ courseTitle, topics, initialTopicId }: CoursePlay
   const handleQuizSubmit = (score: number) => {
     console.log('Quiz submitted with score:', score)
     // Here you would typically save the score to the backend
-    // and unlock the next lesson if passed
+    // Mark topic as completed if score >= 70
+    if (score >= 70) {
+      // TODO: Call your backend API to mark the topic as completed
+      // and unlock the next lesson
+      console.log('Quiz passed! Topic completed.')
+    }
     setIsQuizOpen(false)
+    setIsVideoEnded(false)
   }
 
   const completedCount = topics.filter((t) => t.completed).length
@@ -81,6 +121,51 @@ export function CoursePlayer({ courseTitle, topics, initialTopicId }: CoursePlay
 
   return (
     <div className="bg-background min-h-screen">
+      {/* CSS to prevent dragging while showing timeline and time */}
+      <style jsx global>{`
+        /* Prevent dragging on timeline but keep it visible */
+        video::-webkit-media-controls-timeline {
+          pointer-events: none !important;
+        }
+        
+        /* Keep current time and remaining time displays visible */
+        video::-webkit-media-controls-current-time-display,
+        video::-webkit-media-controls-time-remaining-display {
+          pointer-events: none !important;
+        }
+        
+        /* Prevent right-click download options */
+        video {
+          pointer-events: none !important;
+        }
+        
+        video::-webkit-media-controls {
+          pointer-events: auto !important;
+        }
+        
+        /* Re-enable play/pause, volume, and fullscreen but not timeline */
+        video::-webkit-media-controls-play-button,
+        video::-webkit-media-controls-mute-button,
+        video::-webkit-media-controls-volume-slider,
+        video::-webkit-media-controls-fullscreen-button {
+          pointer-events: auto !important;
+        }
+        
+        /* Hide download button in some browsers */
+        video::-internal-media-controls-download-button {
+          display: none !important;
+        }
+        
+        video::-webkit-media-controls-enclosure {
+          overflow: hidden !important;
+        }
+        
+        /* Disable text selection on video */
+        video::selection {
+          background: transparent !important;
+        }
+      `}</style>
+
       {/* Header */}
       <div className="bg-card shadow-sm border-b border-border/5">
         <div className="max-w-7xl mx-auto px-6 py-10">
@@ -108,13 +193,19 @@ export function CoursePlayer({ courseTitle, topics, initialTopicId }: CoursePlay
                     controls
                     className="w-full h-full object-cover"
                     onEnded={handleVideoEnd}
-                    controlsList="nodownload"
+                    controlsList="nodownload noremoteplayback noplaybackrate"
+                    disablePictureInPicture
+                    disableRemotePlayback
+                    onContextMenu={(e) => e.preventDefault()}
+                    onDragStart={(e) => e.preventDefault()}
                     style={{ pointerEvents: 'auto' }}
                   />
-                  {/* Security overlay to prevent right-click */}
+                  {/* Enhanced security overlay */}
                   <div
                     className="absolute inset-0 pointer-events-none"
                     onContextMenu={(e) => e.preventDefault()}
+                    onDragStart={(e) => e.preventDefault()}
+                    style={{ userSelect: 'none' }}
                   />
                 </>
               ) : (
@@ -223,7 +314,7 @@ export function CoursePlayer({ courseTitle, topics, initialTopicId }: CoursePlay
 
                   {/* Final Exam Link - Cleaned up borders */}
                   <a
-                    href={`${typeof window !== 'undefined' ? window.location.pathname.replace(/\/$/, '') : ''}/exam`}
+                    href="/exam"
                     className="block w-full text-left p-3 mt-4 border border-border/10 bg-secondary/30 hover:bg-secondary/60 rounded-2xl transition-colors cursor-pointer"
                   >
                     <div className="flex items-start gap-3">
