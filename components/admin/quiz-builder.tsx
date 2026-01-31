@@ -149,7 +149,7 @@ export function QuizBuilder({ lesson, open, onOpenChange, onSuccess }: QuizBuild
         <Dialog open={open} onOpenChange={onOpenChange}>
             {/* Main Dialog Container */}
             <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-hidden flex flex-col border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-background">
-                
+
                 <DialogHeader className="px-1">
                     <DialogTitle className="font-black text-2xl uppercase tracking-tighter flex items-center gap-2 text-foreground">
                         <FileQuestion className="h-6 w-6" />
@@ -159,13 +159,13 @@ export function QuizBuilder({ lesson, open, onOpenChange, onSuccess }: QuizBuild
 
                 {/* Content Grid: Left (List) & Right (Form) */}
                 <div className="grid gap-6 md:grid-cols-2 pt-4 overflow-hidden h-full">
-                    
+
                     {/* LEFT SIDE: Question List */}
                     <div className="flex flex-col h-full overflow-hidden space-y-2">
                         <Label className="font-black uppercase text-xs text-foreground">
                             Existing Questions ({questions.length})
                         </Label>
-                        
+
                         <div className="flex-1 overflow-y-auto pr-2 space-y-3 pb-4">
                             {fetching ? (
                                 <div className="flex justify-center py-8">
@@ -181,13 +181,13 @@ export function QuizBuilder({ lesson, open, onOpenChange, onSuccess }: QuizBuild
                                     <Card key={q.id} className="border-2 border-foreground shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bg-card">
                                         <CardHeader className="flex flex-row items-start justify-between py-2 px-3 space-y-0">
                                             <CardTitle className="text-xs font-black text-foreground leading-tight mt-1">
-                                                <span className="text-muted-foreground mr-1">#{i + 1}</span> 
+                                                <span className="text-muted-foreground mr-1">#{i + 1}</span>
                                                 {q.question_text}
                                             </CardTitle>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="sm" 
-                                                onClick={() => deleteQuestion(q.id)} 
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => deleteQuestion(q.id)}
                                                 className="h-6 w-6 p-0 -mr-2 text-muted-foreground hover:text-destructive hover:bg-transparent"
                                             >
                                                 <Trash2 className="h-3 w-3" />
@@ -198,8 +198,8 @@ export function QuizBuilder({ lesson, open, onOpenChange, onSuccess }: QuizBuild
                                                 {q.quiz_options?.sort((a, b) => a.option_order - b.option_order).map(opt => (
                                                     <li key={opt.id} className={cn(
                                                         "font-bold pl-2 border-l-2",
-                                                        opt.is_correct 
-                                                            ? "border-green-500 text-green-700 dark:text-green-400" 
+                                                        opt.is_correct
+                                                            ? "border-green-500 text-green-700 dark:text-green-400"
                                                             : "border-transparent text-muted-foreground"
                                                     )}>
                                                         {opt.option_text} {opt.is_correct && "✓"}
@@ -221,7 +221,7 @@ export function QuizBuilder({ lesson, open, onOpenChange, onSuccess }: QuizBuild
                                 <form onSubmit={handleAddQuestion} className="space-y-4">
                                     {/* Question Input */}
                                     <div className="space-y-2">
-                                        <Label htmlFor="qtext" className="font-black uppercase text-xs text-foreground">
+                                        <Label htmlFor="qtext" className="font-black uppercase text-[10px] px-1 bg-foreground text-background inline-block">
                                             Question Text
                                         </Label>
                                         <Input
@@ -230,38 +230,36 @@ export function QuizBuilder({ lesson, open, onOpenChange, onSuccess }: QuizBuild
                                             onChange={e => setQuestionText(e.target.value)}
                                             required
                                             placeholder="e.g. What is React?"
-                                            // Dark Mode: White paper look
-                                            className="border-2 border-foreground bg-background text-foreground font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] dark:bg-white dark:text-black dark:border-black dark:placeholder:text-zinc-500"
+                                            className="border-2 border-foreground bg-background text-foreground placeholder:text-muted-foreground font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:ring-0 focus:translate-x-px focus:translate-y-px focus:shadow-none transition-all"
                                         />
                                     </div>
 
                                     {/* Options Inputs */}
                                     <div className="space-y-2">
-                                        <Label className="font-black uppercase text-xs text-foreground">
+                                        <Label className="font-black uppercase text-[10px] px-1 bg-foreground text-background inline-block">
                                             Options (Select correct answer)
                                         </Label>
-                                        <RadioGroup 
-                                            value={options.findIndex(o => o.correct).toString()} 
+                                        <RadioGroup
+                                            value={options.findIndex(o => o.correct).toString()}
                                             onValueChange={(val) => setCorrectOption(parseInt(val))}
                                         >
                                             {options.map((opt, idx) => (
                                                 <div key={idx} className="flex items-center gap-2">
-                                                    <RadioGroupItem 
-                                                        value={idx.toString()} 
-                                                        id={`opt-${idx}`} 
+                                                    <RadioGroupItem
+                                                        value={idx.toString()}
+                                                        id={`opt-${idx}`}
                                                         // Ensure visible in dark mode
-                                                        className="border-2 border-foreground text-foreground bg-transparent" 
+                                                        className="border-2 border-foreground text-foreground bg-transparent"
                                                     />
                                                     <Input
                                                         value={opt.text}
                                                         onChange={e => updateOptionText(idx, e.target.value)}
                                                         required
                                                         placeholder={`Option ${idx + 1}`}
-                                                        // Dark Mode: White paper look with green highlight support
                                                         className={cn(
-                                                            "border-2 border-foreground flex-1 text-xs font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bg-background text-foreground dark:bg-white dark:text-black dark:border-black dark:placeholder:text-zinc-500",
-                                                            opt.correct 
-                                                                ? 'bg-green-500/20 border-green-600 dark:bg-green-100 dark:border-green-800' 
+                                                            "border-2 border-foreground flex-1 text-xs font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bg-background text-foreground placeholder:text-muted-foreground transition-all",
+                                                            opt.correct
+                                                                ? 'bg-green-500/10 border-green-600 ring-2 ring-green-600/20'
                                                                 : ''
                                                         )}
                                                     />
@@ -271,9 +269,9 @@ export function QuizBuilder({ lesson, open, onOpenChange, onSuccess }: QuizBuild
                                     </div>
 
                                     {/* Submit Button */}
-                                    <Button 
-                                        type="submit" 
-                                        disabled={loading} 
+                                    <Button
+                                        type="submit"
+                                        disabled={loading}
                                         // Always Black Text for contrast against Yellow
                                         className="w-full border-2 border-foreground bg-yellow-400 text-black font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all"
                                     >

@@ -47,7 +47,8 @@ export default async function CoursePage({
         .from('topics')
         .select(`
             *,
-            quiz_questions (
+
+            quiz_questions:quiz_questions!quiz_questions_topic_id_fkey (
                 *,
                 quiz_options (*)
             )
@@ -87,16 +88,31 @@ export default async function CoursePage({
             questions: (topic.quiz_questions || [])
                 .sort((a: any, b: any) => a.question_order - b.question_order)
                 .map((q: any) => {
-                    const options = (q.quiz_options || [])
+                    // Helper to get options from relationship or fallback column
+                    let options = (q.quiz_options || [])
                         .sort((a: any, b: any) => a.option_order - b.option_order)
                         .map((o: any) => o.option_text)
-                    
-                    const correctAnswer = (q.quiz_options || [])
+
+                    // Fallback to 'options' column if relation is empty (legacy data support)
+                    if (options.length === 0 && q.options && Array.isArray(q.options)) {
+                        options = q.options.map((o: any) => typeof o === 'string' ? o : (o.text || o.option_text || ''))
+                    }
+
+                    // Helper to get correct answer index
+                    let correctAnswer = (q.quiz_options || [])
                         .findIndex((o: any) => o.is_correct)
-                    
+
+                    // Fallback to 'correct_answer' column
+                    if (correctAnswer === -1 && q.correct_answer !== undefined && q.correct_answer !== null) {
+                        correctAnswer = q.correct_answer
+                    }
+
+                    // Fallback for question text (if schema differs)
+                    const questionText = q.question_text || q.question || "Untitled Question"
+
                     return {
                         id: q.id,
-                        question: q.question_text,
+                        question: questionText,
                         correctAnswer: correctAnswer >= 0 ? correctAnswer : 0,
                         options
                     }

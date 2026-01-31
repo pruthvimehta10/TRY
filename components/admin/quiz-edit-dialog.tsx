@@ -175,10 +175,10 @@ export function QuizEditDialog({ lesson, open, onOpenChange, onSuccess }: QuizEd
                                             <CardTitle className="text-xs font-black text-foreground">
                                                 {i + 1}. {q.question_text}
                                             </CardTitle>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="sm" 
-                                                onClick={() => deleteQuestion(q.id)} 
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => deleteQuestion(q.id)}
                                                 className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-red-500/20 dark:hover:bg-red-500/10"
                                             >
                                                 <Trash2 className="h-3 w-3" />
@@ -209,8 +209,7 @@ export function QuizEditDialog({ lesson, open, onOpenChange, onSuccess }: QuizEd
                             <CardContent className="p-4 space-y-4">
                                 <form onSubmit={handleAddQuestion} className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="qtext" className="font-black uppercase text-xs text-background
-                                            bg-foreground">
+                                        <Label htmlFor="qtext" className="font-black uppercase text-[10px] px-1 bg-foreground text-background inline-block">
                                             Question Text
                                         </Label>
                                         <Input
@@ -219,35 +218,33 @@ export function QuizEditDialog({ lesson, open, onOpenChange, onSuccess }: QuizEd
                                             onChange={e => setQuestionText(e.target.value)}
                                             required
                                             placeholder="e.g. What is a component?"
-                                            // FIX: Forced Black text on White background regardless of theme
-                                            className="border-2 border-foreground bg-white text-black placeholder:text-zinc-500 font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                                            className="border-2 border-foreground bg-background text-foreground placeholder:text-muted-foreground font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:ring-0 focus:translate-x-px focus:translate-y-px focus:shadow-none transition-all"
                                         />
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label className="font-black uppercase text-xs text-background bg-foreground">
+                                        <Label className="font-black uppercase text-[10px] px-1 bg-foreground text-background inline-block">
                                             Options (Select the correct one)
                                         </Label>
-                                        <RadioGroup 
-                                            value={options.findIndex(o => o.correct).toString()} 
+                                        <RadioGroup
+                                            value={options.findIndex(o => o.correct).toString()}
                                             onValueChange={(val) => setCorrectOption(parseInt(val))}
                                         >
                                             {options.map((opt, idx) => (
                                                 <div key={idx} className="flex items-center gap-2">
-                                                    <RadioGroupItem 
-                                                        value={idx.toString()} 
-                                                        id={`opt-${idx}`} 
-                                                        className="border-2 border-foreground text-foreground" 
+                                                    <RadioGroupItem
+                                                        value={idx.toString()}
+                                                        id={`opt-${idx}`}
+                                                        className="border-2 border-foreground text-foreground"
                                                     />
                                                     <Input
                                                         value={opt.text}
                                                         onChange={e => updateOptionText(idx, e.target.value)}
                                                         required
                                                         placeholder={`Option ${idx + 1}`}
-                                                        // FIX: Forced Black text on White background regardless of theme
                                                         className={cn(
-                                                            "border-2 border-foreground flex-1 text-xs font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bg-white text-black placeholder:text-zinc-500",
-                                                            opt.correct ? 'bg-green-100 border-green-600' : ''
+                                                            "border-2 border-foreground flex-1 text-xs font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bg-background text-foreground placeholder:text-muted-foreground transition-all",
+                                                            opt.correct ? 'bg-green-500/10 border-green-600 ring-2 ring-green-600/20' : ''
                                                         )}
                                                     />
                                                 </div>
@@ -255,9 +252,9 @@ export function QuizEditDialog({ lesson, open, onOpenChange, onSuccess }: QuizEd
                                         </RadioGroup>
                                     </div>
 
-                                    <Button 
-                                        type="submit" 
-                                        disabled={loading} 
+                                    <Button
+                                        type="submit"
+                                        disabled={loading}
                                         className="w-full border-2 border-foreground bg-yellow-400 text-black font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all"
                                     >
                                         {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}

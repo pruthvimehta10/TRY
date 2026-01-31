@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { ArrowLeft, Loader2, Plus, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 interface Question {
     id: string
@@ -189,7 +190,7 @@ export default function ManageQuizPage({ params }: { params: Promise<{ id: strin
                 {/* Right: Add New Question Form */}
                 <div className="space-y-6">
                     <h3 className="text-xl font-bold">Add New Question</h3>
-                    <Card className="border-4 border-foreground shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] bg-white">
+                    <Card className="border-4 border-foreground shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] bg-card">
                         <CardContent className="p-6 space-y-4">
                             <form onSubmit={handleAddQuestion} className="space-y-4">
                                 <div className="space-y-2">
@@ -215,7 +216,10 @@ export default function ManageQuizPage({ params }: { params: Promise<{ id: strin
                                                     onChange={e => updateOptionText(idx, e.target.value)}
                                                     required
                                                     placeholder={`Option ${idx + 1}`}
-                                                    className={`border-2 border-foreground flex-1 ${opt.correct ? 'bg-green-50 border-green-600' : ''}`}
+                                                    className={cn(
+                                                        "border-2 border-foreground flex-1 font-bold",
+                                                        opt.correct ? 'bg-green-500/10 border-green-600 ring-2 ring-green-600/20 text-foreground' : 'bg-background text-foreground'
+                                                    )}
                                                 />
                                             </div>
                                         ))}
