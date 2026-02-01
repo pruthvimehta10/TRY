@@ -26,7 +26,8 @@ interface CoursePlayerProps {
   initialTopicId: string
 }
 
-export function CoursePlayer({ courseTitle, topics, initialTopicId }: CoursePlayerProps) {
+export function CoursePlayer({ courseTitle, topics: initialTopics, initialTopicId }: CoursePlayerProps) {
+  const [topics, setTopics] = useState(initialTopics)
   const [currentTopicId, setCurrentTopicId] = useState(initialTopicId)
   const [isVideoEnded, setIsVideoEnded] = useState(false)
   const [showQuizPrompt, setShowQuizPrompt] = useState(false)
@@ -35,12 +36,17 @@ export function CoursePlayer({ courseTitle, topics, initialTopicId }: CoursePlay
 
   const currentTopic = topics.find((t) => t.id === currentTopicId)
 
+  // Sync props to state if they change (e.g. initial load vs revalidation)
+  useEffect(() => {
+    setTopics(initialTopics)
+  }, [initialTopics])
+
   // Auto-select first topic if initialTopicId is not valid
   useEffect(() => {
     if (!currentTopic && topics.length > 0) {
       setCurrentTopicId(topics[0].id)
     }
-  }, [currentTopic, topics, initialTopicId])
+  }, [currentTopic, topics])
 
   // Prevent playback rate changes and enforce normal speed
   useEffect(() => {
@@ -79,14 +85,18 @@ export function CoursePlayer({ courseTitle, topics, initialTopicId }: CoursePlay
     // Automatically open quiz modal when video ends
     if (currentTopic?.questions && currentTopic.questions.length > 0) {
       setIsQuizOpen(true)
+    } else {
+      // If no quiz, maybe show prompt or just mark complete? 
+      // For now, let's show prompt if there are no questions? 
+      // Or assume prompt is for quiz. 
+      // Logic: No questions -> User manually clicks next or we auto-advance? 
+      // Let's assume most lessons have quizzes given the user flow.
+      setShowQuizPrompt(true)
     }
   }
 
   const handleTopicClick = (topicId: string) => {
     const topic = topics.find((t) => t.id === topicId)
-    // Allow clicking if not locked or if it's the current one (though logic prevents that loop usually)
-    // In a real app we might allow re-watching locked previous topics if completed?
-    // For now assuming locked = strictly next in sequence not reached
     if (!topic?.isLocked) {
       setCurrentTopicId(topicId)
       setIsVideoEnded(false)
@@ -103,15 +113,48 @@ export function CoursePlayer({ courseTitle, topics, initialTopicId }: CoursePlay
     setIsQuizOpen(false)
   }
 
-  const handleQuizSubmit = (score: number) => {
+  const handleQuizSubmit = async (score: number) => {
     console.log('Quiz submitted with score:', score)
-    // Here you would typically save the score to the backend
+
     // Mark topic as completed if score >= 70
     if (score >= 70) {
-      // TODO: Call your backend API to mark the topic as completed
-      // and unlock the next lesson
-      console.log('Quiz passed! Topic completed.')
+      try {
+        // 1. Call backend API to mark as completed
+        // Note: using 'topics' route but check if it matches 'lessons' terminology in backend
+        await fetch(`/api/topics/${currentTopicId}/complete`, {
+          method: 'POST'
+        })
+
+        console.log('Quiz passed! Topic completed.')
+
+        // 2. Update local state
+        const currentIndex = topics.findIndex(t => t.id === currentTopicId)
+        const newTopics = [...topics]
+
+        // Mark current as completed
+        newTopics[currentIndex] = { ...newTopics[currentIndex], completed: true }
+
+        // Unlock next topic
+        let nextTopicId = null
+        if (currentIndex + 1 < newTopics.length) {
+          newTopics[currentIndex + 1] = { ...newTopics[currentIndex + 1], isLocked: false }
+          nextTopicId = newTopics[currentIndex + 1].id
+        }
+
+        setTopics(newTopics)
+
+        // 3. Auto-advance
+        if (nextTopicId) {
+          setCurrentTopicId(nextTopicId)
+        }
+
+      } catch (e) {
+        console.error("Failed to save progress", e)
+      }
+    } else {
+      alert("You must score at least 70% to proceed. Please try again.")
     }
+
     setIsQuizOpen(false)
     setIsVideoEnded(false)
   }

@@ -94,7 +94,6 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const supabase = await createClient()
     const { searchParams } = new URL(req.url)
     const courseId = searchParams.get('id')
 
